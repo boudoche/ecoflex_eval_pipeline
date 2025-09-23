@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "id": "Q1",
+      "question": "List all projects that exist in the company, including past, current, and planned ones.",
+      "expected_answer": "AquaSentinel: Environmental R&D; EcoFlex: Proof of Concept – App Interface, EcoFlex Multi-Residential v1.0, EcoFlex Industrial v1.0, EcoFlex Home – Gamification Layer, Weekly Consumption Reporting, EcoFlex Home"
+    },
+    {
+      "id": "Q2",
+      "question": "What is EcoFlex?",
+      "expected_answer": "EcoFlex is a modular energy optimization platform that uses machine learning to forecast energy peaks, enables predictive source switching and alerting, provides dashboards for real-time and historical energy insights, and is tailored for different user types: industrial clients, apartments, and households."
+    },
+    {
+      "id": "Q3",
+      "question": "Who is working on the Ecoflex weekly report?",
+      "expected_answer": "Louis (Project Lead), Aisha (Data Analysis and Energy Consumption Predictions), Tomás (Backend Development and Automation), Camille (Report Design and UX), and Nils (Validation of Energy Recommendations)."
+    },
+    {
+      "id": "Q4",
+      "question": "What are the different elements of the Ecoflex app interface?",
+      "expected_answer": "The EcoFlex app interface includes the Home screen, Predictions screen, and Tips screen, supports light and dark themes, displays energy predictions through line charts, includes tiered notification indicators, and features a consistent iconography system with accessibility adjustments."
+    },
+    {
+      "id": "Q5",
+      "question": "Who is Camille and what is she working on?",
+      "expected_answer": "Camille is working on the Ecoflex project, focusing on designing the web dashboard and integrating features to enhance user experience. She is fine-tuning mobile responsiveness, optimizing layout, incorporating AI insights, and aligning design with user needs."
+    },
+    {
+      "id": "Q6",
+      "question": "Give me all emails sent by Camille.",
+      "expected_answer": "UX Transition Feedback – Onboarding Flow; Initial UI Priorities for EcoFlex Dashboard; UI Alert Visuals – A/B Test Feedback Summary; Animation Plan – EcoFlex Home Gamification; Example Web Dashboard Ready for Review; Retreat Location Poll Results Summary; Dietary Info; an email without subject quoted in 'Thank You All – Retreat Reflections'."
+    },
+    {
+      "id": "Q7",
+      "question": "In which file is the summary of Aisha's and Nils' meeting?",
+      "expected_answer": "Meeting_Summary_Peak_Usage_Thresholds_Final.docx in Ecoflex/weekly_consumption_report."
+    },
+    {
+      "id": "Q8",
+      "question": "Who won the game at the winter retreat?",
+      "expected_answer": "Freya won the Snow Games with 29 points, excelling in snow sculpting."
+    },
+    {
+      "id": "Q9",
+      "question": "What are the main features and goals of the EcoFlex app?",
+      "expected_answer": "EcoFlex app provides an intuitive interface with color-coded elements and icons, helps users understand energy usage, offers timely alerts, customizable notifications, real-time feedback, weekly summaries, comparisons, and supports automation with manual/auto-modes."
+    },
+    {
+      "id": "Q10",
+      "question": "What is the latest product launched by GreenHorizon?",
+      "expected_answer": "AquaSentinel, an environmental monitoring system in active R&D."
+    },
+    {
+      "id": "Q11",
+      "question": "List the freelance or consulting contributors to GreenHorizon’s projects.",
+      "expected_answer": "Dr. Sofia Arvidsson (environmental consultant, AquaSentinel) and Claire Tschudi (freelance QA and Product Coordinator, July–August 2025)."
+    },
+    {
+      "id": "Q12",
+      "question": "What is Nils Jörgensen’s role?",
+      "expected_answer": "Nils is Energy Engineer, validating and improving energy models."
+    },
+    {
+      "id": "Q13",
+      "question": "When was the poll for choosing the winter retreat location held?",
+      "expected_answer": "October 2024, results sent by Camille on October 21, 2024."
+    },
+    {
+      "id": "Q14",
+      "question": "When, where, and by whom was the GreenHorizon company founded?",
+      "expected_answer": "Founded on September 26, 2022, in Lausanne, Switzerland by Emma Dubois and Dr. Elena Petrovic."
+    },
+    {
+      "id": "Q15",
+      "question": "How much funding was initially requested by Emma Dubois?",
+      "expected_answer": "CHF 400,000 in seed funding."
+    },
+    {
+      "id": "Q16",
+      "question": "What projects was the company had reported work activity on March 12, 2025?",
+      "expected_answer": "EcoFlex → Weekly Consumption Reporting (dashboard updates by Camille, model improvements by Aisha, anomaly validation by Nils)."
+    },
+    {
+      "id": "Q17",
+      "question": "List the most recent employees hired by GreenHorizon (not external consultants).",
+      "expected_answer": "Freya Nielsen (UX designer) and Luca Keller (Mobile Developer), hired September 2024."
+    },
+    {
+      "id": "Q18",
+      "question": "Who is working on the Ecoflex app concept?",
+      "expected_answer": "Javier Ramirez (Project Manager), Luca Keller (Mobile Developer), Freya Nielsen (UX/UI Designer), Marco Rossi (Backend Developer)."
+    },
+    {
+      "id": "Q19",
+      "question": "Who is Luca Keller and what is he working on?",
+      "expected_answer": "Luca Keller is a mobile app developer working on the Ecoflex PoC app, responsible for cross-platform framework, UI, predictions integration, and testing."
+    },
+    {
+      "id": "Q20",
+      "question": "What emails mention Javier Ramirez?",
+      "expected_answer": "Team Roles and Responsibilities for EcoFlex Mobile App PoC; Re: Feedback Request on MVP UI Design Mockups; Dietary emails in February 2025 retreat archive; an email without subject quoted in 'Thank You All – Retreat Reflections'."
+    },
+    {
+      "id": "Q21",
+      "question": "What is the Ecoflex weekly report about?",
+      "expected_answer": "Automated weekly reports on energy consumption, peak usage, optimization impacts, comparisons with past weeks, personalized recommendations, delivered as PDF and email summaries. Kickoff stage, release planned March 21, 2025."
+    },
+    {
+      "id": "Q22",
+      "question": "Who led the kick-off for the EcoFlex weekly report project?",
+      "expected_answer": "Louis led the kick-off."
+    },
+    {
+      "id": "Q23",
+      "question": "What are the elements displayed in the Ecoflex weekly report dashboard?",
+      "expected_answer": "Weekly consumption trends, peak usage breakdowns, AI-generated insights, comparisons with past weeks, presented as PDF and email."
+    },
+    {
+      "id": "Q24",
+      "question": "Give me the URL to the Ecoflex weekly report example dashboard.",
+      "expected_answer": "https://dashboard.greenhorizon.com/preview/ecoflex-v1"
+    },
+    {
+      "id": "Q25",
+      "question": "When did Louis request a 'key takeaways' box?",
+      "expected_answer": "March 11, 2025, in an email to Camille."
+    },
+    {
+      "id": "Q26",
+      "question": "When testing the anonymization layer of EcoFlex Multi-Residential, what was the size of the synthetic population?",
+      "expected_answer": "50 buildings, 20 units each → 1000 tenants."
+    },
+    {
+      "id": "Q27",
+      "question": "What kinds of alerts does the EcoFlex Home app provide?",
+      "expected_answer": "Forecast-based alerts, usage anomalies, battery/solar thresholds, peer comparison nudges."
+    },
+    {
+      "id": "Q28",
+      "question": "What was the result of the poll for choosing the winter retreat location and date?",
+      "expected_answer": "Leukerbad, February 3–6, 2025."
+    },
+    {
+      "id": "Q29",
+      "question": "What features is GreenHorizon using to gamify the EcoFlex Home experience?",
+      "expected_answer": "Daily & weekly challenges, badge system, streak tracking, weekly scorecards, interactive feedback with animations and visuals."
+    },
+    {
+      "id": "Q30",
+      "question": "What feedback did users give about the scorecard feature, in the Home app, during the Alpha pilot?",
+      "expected_answer": "Users liked gamification but noted confusion about badges, wanted peer comparison, layout issues on small screens, interest in personal goal setting, and more feedback when goals missed."
+    },
+    {
+      "id": "Q31",
+      "question": "Which Python libraries are discussed to be used in the Ecoflex weekly report project?",
+      "expected_answer": "Pandas, NumPy, Prophet (for anomaly detection), ReportLab (PDFs), Jinja2 (emails), Celery (job queuing)."
+    },
+    {
+      "id": "Q32",
+      "question": "Give me all emails sent by Luca Keller.",
+      "expected_answer": "[EcoFlex Home] Alpha App Now Live!; [Dev Update] Repository Setup Complete; Basic Features Integration Update; Re: Basic Features Integration Update – Bug Noticed; Re: Feedback Request on MVP UI Design Mockups; Packing List & Travel Tips – Retreat; Dietary Summary; an email without subject in 'Thank You All – Retreat Reflections'."
+    },
+    {
+      "id": "Q33",
+      "question": "At what event was Camille invited to speak back in 2023?",
+      "expected_answer": "Camille was not invited to speak at any event in 2023. The speaking engagement at RE-Source Europe 2023 was by Emma Dubois."
+    },
+    {
+      "id": "Q34",
+      "question": "What role did Dr. Elena Petrovic play in the first technical prototype phase, and what files did she author?",
+      "expected_answer": "Dr. Elena Petrovic was co-founder and lead data scientist. She designed and implemented the peak detection algorithm, ran validation tests, set up the GitHub repo, authored the first draft of the whitepaper, and documented performance metrics and in-code documentation."
+    },
+    {
+      "id": "Q35",
+      "question": "What was the purpose of the infrastructure scaling project in Q4 2023, and which technologies were introduced as part of the solution?",
+      "expected_answer": "Purpose: prepare EcoFlex for multi-site deployments by moving from monolithic to modular, scalable architecture. Technologies: Docker, Kubernetes, GitHub Actions, Prometheus, Grafana. Result: v1.0 release and CHF 200,000 innovation grant."
+    },
+    {
+      "id": "Q36",
+      "question": "Who was responsible for deploying the Kubernetes infrastructure during the Q4 2023 project, and which documents show their contributions?",
+      "expected_answer": "Marco Rossi, backend developer. Contributions documented in k8s_test_cluster_config_101623.yml, ecoflex_kubernetes_deployment_guide_v1.docx, legacy_backend_issues_analysis_100623.docx, grafana_metrics_dashboard_snapshot_102423.png, and email_onboarding_marco_100223.eml."
+    },
+    {
+      "id": "Q37",
+      "question": "What technical challenges did the team face when anonymizing tenant data, and how did it affect the performance of the forecasting model?",
+      "expected_answer": "Challenges: pseudonymization and noise injection by Aisha reduced forecasting accuracy, especially for solar spikes and peaks. Mitigation: Elena added noise-handling improvements; Aisha released v2 with tiered masking. Documented in anonymization_module_v1_012424.py, forecast_accuracy_report_masking_013024.docx, email_model_noise_tuning_summary_020924.eml."
+    },
+    {
+      "id": "Q38",
+      "question": "Which pilot site was selected for testing EcoFlex in apartment complexes, and how was the pilot structured?",
+      "expected_answer": "Lausanne apartment complex, 6 units, started March 4, 2024. Tested shared load optimization and per-unit data, GDPR pipeline, UX interviews. Results in email_pilot_launch_confirmation_030424.eml, meeting_ux_interview_findings_031124.txt, apartment_pilot_summary_report_032924.docx."
+    },
+    {
+      "id": "Q39",
+      "question": "What is EcoCell, and how does it integrate with EcoFlex?",
+      "expected_answer": "EcoCell is a 2.5kWh LiFePO4 Smart Battery launched Q3 2025. Features: solar/grid charging, Wi-Fi/MQTT telemetry, safety protocols, peak shaving. Integration: firmware by Victor Lin, APIs by Tomás García, adaptive algorithms by Elena, UX flows by Camille. Streams live data into EcoFlex for optimized charging cycles."
+    },
+    {
+      "id": "Q40",
+      "question": "Who participated in the EcoCell pilot program, and what issues were discovered during testing?",
+      "expected_answer": "Ran in August 2025 across Lausanne, Morges, Nyon. Participants: early adopters recruited by Emma. Issues: charging pause bug fixed by Victor, onboarding improvements by Camille, algorithm tuning by Elena. Documented in firmware_patch_timing_fix_081425.c, user_setup_guide_pilot_draft_080525.docx, email_algorithm_update_tuning_082225.eml."
+    }
+  ]
+}

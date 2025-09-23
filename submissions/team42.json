@@ -1,0 +1,13 @@
+{
+  "participant_id": "Team42",
+  "answers": [
+    {
+      "question_id": "Q34",
+      "answer": "Dr. Elena Petrovic led the technical prototype, designing peak detection, running tests, setting up the repo, drafting the whitepaper, and documenting performance."
+    },
+    {
+      "question_id": "Q35",
+      "answer": "The Q4 2023 infrastructure scaling project prepared EcoFlex for multi-site deployments by introducing Docker, Kubernetes, GitHub Actions, Prometheus and Grafana. It culminated in v1.0 and a CHF 200k grant."
+    }
+  ]
+}

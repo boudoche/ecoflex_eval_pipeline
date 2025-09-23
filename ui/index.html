@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ecoflex Submission</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; color: #111827; }
+    h1 { margin-bottom: 0.25rem; }
+    .sub { color: #6b7280; margin-bottom: 1.25rem; }
+    .dropzone {
+      border: 2px dashed #2563eb;
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 2.25rem;
+      text-align: center;
+      color: #475569;
+      transition: background 0.2s, border-color 0.2s;
+      max-width: 680px;
+    }
+    .dropzone.dragover { background: #eff6ff; border-color: #1d4ed8; }
+    .note { margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280; }
+    .hidden { display: none; }
+    .msg { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 10px; max-width: 680px; }
+    .ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .row { margin-top: 0.75rem; }
+    button { background: #2563eb; color: white; border: 0; padding: 0.6rem 1.1rem; border-radius: 10px; cursor: pointer; }
+    button:disabled { background: #93c5fd; cursor: not-allowed; }
+    input[type="file"] { display: none; }
+    .link { color: #2563eb; text-decoration: underline; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Submit your answers</h1>
+  <div class="sub">Drop your JSON file below to submit. You’ll see a confirmation when complete.</div>
+
+  <div id="dropzone" class="dropzone">
+    Drag & drop your JSON file here
+    <div class="note">or <span id="browse" class="link">choose a file</span></div>
+    <input id="fileInput" type="file" accept="application/json,.json" />
+  </div>
+
+  <div id="message" class="msg hidden"></div>
+
+  <div class="row">
+    <button id="submitBtn" disabled>Submit</button>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const browse = document.getElementById('browse');
+    const submitBtn = document.getElementById('submitBtn');
+    const message = document.getElementById('message');
+
+    let payload = null;
+
+    function showMessage(text, ok=true) {
+      message.textContent = text;
+      message.className = 'msg ' + (ok ? 'ok' : 'err');
+    }
+
+    function clearMessage() {
+      message.textContent = '';
+      message.className = 'msg hidden';
+    }
+
+    function handleFiles(files) {
+      const file = files && files[0];
+      if (!file) return;
+      clearMessage();
+      if (!file.name.endsWith('.json')) {
+        showMessage('Please upload a .json file.', false);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          payload = JSON.parse(reader.result);
+          submitBtn.disabled = false;
+          showMessage('File ready to submit.');
+        } catch (e) {
+          showMessage('Invalid JSON file.', false);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    browse.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    submitBtn.addEventListener('click', async () => {
+      if (!payload) return;
+      submitBtn.disabled = true;
+      showMessage('Submitting...');
+      try {
+        const params = new URLSearchParams({ use_llm: 'true', model: 'gpt-3.5-turbo', write_files: 'true' });
+        const res = await fetch(`/grade?${params.toString()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          showMessage('Submission complete.');
+        } else {
+          showMessage('Submission failed. Please try again.', false);
+        }
+      } catch (e) {
+        showMessage('Network error. Please try again.', false);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

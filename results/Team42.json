@@ -1,0 +1,25 @@
+{
+  "participant_id": "Team42",
+  "questions": [
+    {
+      "question_id": "Q34",
+      "evaluation": {
+        "completeness": 4,
+        "conciseness": 5,
+        "correctness": 5,
+        "comment": "The participant's answer is mostly complete, missing only the specific mention of Dr. Petrovic's role as co-founder and the detailed description of 'performance metrics and in-code documentation'. The answer is concise and all provided information is correct.",
+        "score": 4.7
+      }
+    },
+    {
+      "question_id": "Q35",
+      "evaluation": {
+        "completeness": 4,
+        "conciseness": 5,
+        "correctness": 5,
+        "comment": "The participant's answer is mostly complete, mentioning the purpose and technologies introduced, but it lacks the detail about moving from monolithic to modular architecture. The answer is concise and all facts are correct.",
+        "score": 4.7
+      }
+    }
+  ]
+}
