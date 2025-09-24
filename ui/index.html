@@ -17,6 +17,7 @@
       color: #475569;
       transition: background 0.2s, border-color 0.2s;
       max-width: 680px;
+      position: relative;
     }
     .dropzone.dragover { background: #eff6ff; border-color: #1d4ed8; }
     .note { margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280; }
@@ -31,6 +32,10 @@
     .link { color: #2563eb; text-decoration: underline; cursor: pointer; }
     input[type="text"] { padding: 0.5rem 0.6rem; border: 1px solid #d1d5db; border-radius: 8px; width: 320px; }
     label { font-size: 0.9rem; color: #374151; }
+    /* File chip */
+    .file-list { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+    .file-chip { display: inline-flex; align-items: center; gap: 0.5rem; background: #ffffff; border: 1px solid #e5e7eb; color: #374151; padding: 0.35rem 0.6rem; border-radius: 9999px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); font-size: 0.9rem; }
+    .file-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; }
   </style>
 </head>
 <body>
@@ -45,6 +50,7 @@
   <div id="dropzone" class="dropzone" style="margin-top: 0.75rem;">
     Drag & drop your JSON file here
     <div class="note">or <span id="browse" class="link">choose a file</span></div>
+    <div id="fileList" class="file-list hidden"></div>
     <input id="fileInput" type="file" accept="application/json,.json" />
   </div>
 
@@ -61,6 +67,7 @@
     const submitBtn = document.getElementById('submitBtn');
     const message = document.getElementById('message');
     const tokenEl = document.getElementById('token');
+    const fileList = document.getElementById('fileList');
 
     let payload = null;
 
@@ -74,6 +81,20 @@
       message.className = 'msg hidden';
     }
 
+    function showFileChip(name) {
+      fileList.innerHTML = '';
+      const chip = document.createElement('div');
+      chip.className = 'file-chip';
+      const dot = document.createElement('span');
+      dot.className = 'file-dot';
+      const text = document.createElement('span');
+      text.textContent = name;
+      chip.appendChild(dot);
+      chip.appendChild(text);
+      fileList.appendChild(chip);
+      fileList.classList.remove('hidden');
+    }
+
     function handleFiles(files) {
       const file = files && files[0];
       if (!file) return;
@@ -82,6 +103,7 @@
         showMessage('Please upload a .json file.', false);
         return;
       }
+      showFileChip(file.name);
       const reader = new FileReader();
       reader.onload = () => {
         try {
