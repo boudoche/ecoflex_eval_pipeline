@@ -25,7 +25,7 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.3.0")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.3.1")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -139,9 +139,27 @@ async def _run_in_executor(func, *args, **kwargs):
     return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))
 
 
+def _coerce_submission_shape(obj: Any) -> Dict[str, Any]:
+    # If the payload is a bare list, assume it's the answers array
+    if isinstance(obj, list):
+        return {"answers": obj}
+    if not isinstance(obj, dict):
+        raise HTTPException(status_code=400, detail="Invalid submission payload; expected JSON object or array")
+    # Accept common alternative keys
+    if "answers" not in obj:
+        if "items" in obj and isinstance(obj["items"], list):
+            obj = {**obj, "answers": obj["items"]}
+        elif "data" in obj and isinstance(obj["data"], list):
+            obj = {**obj, "answers": obj["data"]}
+    answers = obj.get("answers")
+    if not isinstance(answers, list) or len(answers) == 0:
+        raise HTTPException(status_code=400, detail="No answers provided; expected non-empty 'answers' array")
+    return obj
+
+
 @app.post("/grade")
 async def grade_submission(
-    submission: Dict[str, Any],
+    submission: Any,
     use_llm: bool = Query(True, description="Use OpenAI LLM instead of heuristics"),
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
@@ -152,20 +170,23 @@ async def grade_submission(
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
 
-    submission = dict(submission)
-    submission["participant_id"] = team
+    sub = _coerce_submission_shape(submission)
+    sub = dict(sub)
+    sub["participant_id"] = team
 
     try:
         result = await _run_in_executor(
             evaluate_submission,
             questions,
-            submission,
+            sub,
             use_llm,
             DEFAULT_MODEL,
             FIXED_WORKERS,
             None,
             int(os.getenv("SELF_CONSISTENCY_RUNS", "1")),
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -213,7 +234,7 @@ async def grade_submission(
 
 @app.post("/grade-batch")
 async def grade_batch(
-    submissions: List[Dict[str, Any]],
+    submissions: List[Any],
     use_llm: bool = Query(True),
     write_files: bool = Query(True),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
@@ -239,8 +260,13 @@ async def grade_batch(
         ]
         all_rows: List[Dict[str, Any]] = []
 
-    for submission in submissions:
-        sub = dict(submission)
+    for item in submissions:
+        try:
+            sub = _coerce_submission_shape(item)
+        except HTTPException as he:
+            results.append({"error": he.detail})
+            continue
+        sub = dict(sub)
         sub["participant_id"] = team
         try:
             result = await _run_in_executor(

@@ -158,17 +158,19 @@
       clearMessage();
       const token = (tokenEl.value || '').trim();
       if (!token) { showMessage('Submission token is required.', false); return; }
+      // Coerce payload shape: if it's an array, wrap as {answers: [...]}
+      let bodyPayload = Array.isArray(payload) ? { answers: payload } : payload;
       submitBtn.disabled = true;
       showMessage('Submitting...');
       try {
-        const params = new URLSearchParams({ use_llm: 'true', model: 'gpt-3.5-turbo', write_files: 'true' });
+        const params = new URLSearchParams({ use_llm: 'true', write_files: 'true' });
         const res = await fetch(`/grade?${params.toString()}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-Submission-Token': token,
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(bodyPayload),
         });
         if (res.ok) {
           showMessage('Submission complete.');
