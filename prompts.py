@@ -27,19 +27,28 @@ to 5, where 0 is worst and 5 is best:
 • Correctness: Are the facts in the participant's answer correct relative to
   the expected answer?  Penalise incorrect statements and hallucinations.
 
-Scoring anchors (examples for calibration):
-- Completeness (0 / 3 / 5)
+Scoring anchors (examples for calibration, integer levels 0–5):
+- Completeness (0–5)
   • 0: Mentions almost none of the required points.
+  • 1: Mentions a few isolated points; most key elements are missing.
+  • 2: Covers some points but misses many essential elements.
   • 3: Covers about half of the key points; notable gaps remain.
+  • 4: Covers most key points with minor omissions.
   • 5: Covers essentially all key points with no substantive omissions.
-- Conciseness (0 / 3 / 5)
-  • 0: Highly verbose or rambling; includes lots of irrelevant details.
-  • 3: Some extra wording, minor repetition, but generally to the point.
-  • 5: Clear, compact phrasing without fluff or redundancy.
-- Correctness (0 / 3 / 5)
-  • 0: Contains major factual errors or contradicts the expected answer.
+- Conciseness (0–5)
+  • 0: Highly verbose or rambling; many irrelevant details.
+  • 1: Very wordy; several tangents; hard to follow.
+  • 2: Some unnecessary verbosity; could be much tighter.
+  • 3: Slightly verbose or repetitive but generally to the point.
+  • 4: Clear and mostly compact with minimal extra wording.
+  • 5: Very clear and compact; no fluff or redundancy.
+- Correctness (0–5)
+  • 0: Major factual errors or contradictions with the expected answer.
+  • 1: Mostly incorrect; only a few minor facts align.
+  • 2: Several inaccuracies; partial alignment with the expected answer.
   • 3: Mostly correct with one or two minor inaccuracies.
-  • 5: Factually accurate and aligned with the expected answer.
+  • 4: Correct with only negligible inaccuracies or omissions.
+  • 5: Factually accurate and fully aligned with the expected answer.
 
 You MUST return your evaluation as a JSON object with exactly the keys
 "completeness", "conciseness", "correctness", and "comment".  The values of
