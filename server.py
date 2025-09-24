@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query, Header, Request
@@ -24,6 +25,15 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 # Token sources
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
+
+# Logging configuration (includes filename and line number)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s %(name)s [%(process)d] %(filename)s:%(lineno)d - %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S.%f%z",
+)
+logger = logging.getLogger("ecoflex")
 
 app = FastAPI(title="Ecoflex Auto Grader", version="1.3.3")
 
@@ -98,6 +108,7 @@ async def startup_event() -> None:
     try:
         _state["questions"] = load_questions(QUESTIONS_PATH)
     except Exception as exc:
+        logger.exception("Failed to load questions from %s", QUESTIONS_PATH)
         raise RuntimeError(f"Failed to load questions from {QUESTIONS_PATH}: {exc}")
     _state["token_to_team"] = _load_tokens()
     # ThreadPool for running CPU/IO bound grading off the event loop
@@ -123,6 +134,7 @@ async def reload_questions() -> Dict[str, str]:
         _state["questions"] = load_questions(QUESTIONS_PATH)
         return {"status": "reloaded"}
     except Exception as exc:
+        logger.exception("Failed to reload questions")
         raise HTTPException(status_code=400, detail=f"Failed to reload questions: {exc}")
 
 
@@ -196,6 +208,7 @@ async def grade_submission(
     except HTTPException:
         raise
     except Exception as exc:
+        logger.exception("Grading failed for team %s (single)", team)
         raise HTTPException(status_code=400, detail=str(exc))
 
     if write_files:
@@ -235,6 +248,7 @@ async def grade_submission(
                         writer.writerow(r)
             await _run_in_executor(_write_csv, csv_path, fieldnames, rows)
         except Exception as exc:
+            logger.exception("Failed to write results for participant %s", pid)
             raise HTTPException(status_code=500, detail=f"Failed to write results: {exc}")
 
     return result
@@ -279,6 +293,7 @@ async def grade_batch(
         try:
             sub = _coerce_submission_shape(item)
         except HTTPException as he:
+            logger.error("Invalid submission shape: %s", he.detail)
             results.append({"error": he.detail})
             continue
         sub = dict(sub)
@@ -299,6 +314,7 @@ async def grade_batch(
             )
             results.append(result)
         except Exception as exc:
+            logger.exception("Grading failed for team %s (batch)", team)
             results.append({"participant_id": sub.get("participant_id", "unknown"), "error": str(exc)})
             continue
 
@@ -319,6 +335,7 @@ async def grade_batch(
                         }
                     )
             except Exception as exc:
+                logger.exception("Failed to write results for participant %s (batch)", pid)
                 results.append({"participant_id": pid, "error": f"Failed to write results: {exc}"})
 
     if write_files:
@@ -332,6 +349,7 @@ async def grade_batch(
                         writer.writerow(r)
             await _run_in_executor(_write_csv, csv_path, fieldnames, all_rows)
         except Exception as exc:
+            logger.exception("Failed to write summary CSV")
             raise HTTPException(status_code=500, detail=f"Failed to write summary: {exc}")
 
     return {"results": results}

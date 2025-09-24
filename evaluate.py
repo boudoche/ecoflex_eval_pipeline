@@ -28,6 +28,7 @@ import random
 import threading
 from statistics import median
 from typing import Dict, Any, List, Tuple, Optional
+import logging
 
 from prompts import build_prompt, parse_response
 
@@ -47,6 +48,10 @@ _OPENAI_SEMAPHORE = threading.Semaphore(_OPENAI_CONCURRENCY)
 
 # Default self-consistency runs (can be overridden by env and CLI)
 DEFAULT_SC_RUNS = int(os.getenv("SELF_CONSISTENCY_RUNS", "3"))
+
+# LLM response logging control
+LLM_LOG_RESPONSES = os.getenv("LLM_LOG_RESPONSES", "").lower() in ("1", "true", "yes", "on")
+_LLM_LOGGER = logging.getLogger("ecoflex.llm")
 
 
 def load_weights_from_env() -> Tuple[float, float, float]:
@@ -251,7 +256,12 @@ def _call_openai_chat(prompt: str, model: str) -> str:
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.0,
                 )
-                return response["choices"][0]["message"]["content"]
+                content = response["choices"][0]["message"]["content"]
+                if LLM_LOG_RESPONSES:
+                    _LLM_LOGGER.info("LLM model=%s response=%s", model, content)
+                else:
+                    _LLM_LOGGER.debug("LLM model=%s response=%s", model, content)
+                return content
             except Exception as e:
                 # Backoff on transient errors (rate limit, 5xx, network)
                 if attempt >= max_retries:
