@@ -226,7 +226,7 @@ def weighted_score(evaluation: Dict[str, float]) -> float:
     cpl = evaluation["completeness"]
     ccs = evaluation["conciseness"]
     crt = evaluation["correctness"]
-    score = (1/3) * cpl + (1/3) * ccs + (1/3) * crt
+    score = 0.3 * cpl + 0.2 * ccs + 0.5 * crt
     return round(score, 2)
 
 
@@ -234,7 +234,8 @@ def evaluate_submission(
     questions: Dict[str, Dict[str, str]],
     submission: Dict[str, Any],
     use_llm: bool = False,
-    model: str = "gpt-4o-mini"
+    model: str = "gpt-3.5-turbo",
+    workers: int = 1,
 ) -> Dict[str, Any]:
     """Evaluate all answers from a single participant submission.
 
@@ -248,6 +249,8 @@ def evaluate_submission(
         Whether to use an LLM instead of heuristic scoring.  Defaults to False.
     model : str, optional
         The OpenAI model to use when calling the LLM.  Defaults to "gpt-3.5-turbo".
+    workers : int, optional
+        Number of parallel workers.  1 means sequential. Defaults to 1.
 
     Returns
     -------
@@ -256,13 +259,11 @@ def evaluate_submission(
         evaluations per question.
     """
     participant_id = submission.get("participant_id") or "unknown"
-    results = {
-        "participant_id": participant_id,
-        "questions": [],
-    }
-    for answer in submission.get("answers", []):
-        qid = answer.get("question_id")
-        ans_text = answer.get("answer", "")
+    answers_list = list(submission.get("answers", []))
+
+    def process_one(item: Dict[str, Any]) -> Dict[str, Any]:
+        qid = item.get("question_id")
+        ans_text = item.get("answer", "")
         if qid not in questions:
             raise KeyError(f"Question ID '{qid}' not found in questions file")
         q_info = questions[qid]
@@ -273,10 +274,27 @@ def evaluate_submission(
         else:
             evaluation = heuristic_evaluate(expected, ans_text)
         evaluation["score"] = weighted_score(evaluation)
-        results["questions"].append({
-            "question_id": qid,
-            "evaluation": evaluation,
-        })
+        return {"question_id": qid, "evaluation": evaluation}
+
+    results_questions: List[Dict[str, Any]] = []
+
+    if workers and workers > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        # Cap workers to a reasonable number to avoid API rate limits
+        max_workers = max(1, min(workers, 10))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(process_one, item) for item in answers_list]
+            # Preserve original order
+            results_questions = [f.result() for f in futures]
+    else:
+        for item in answers_list:
+            results_questions.append(process_one(item))
+
+    results = {
+        "participant_id": participant_id,
+        "questions": results_questions,
+    }
     return results
 
 
@@ -324,6 +342,7 @@ def main() -> None:
     parser.add_argument("--out_dir", required=True, help="Directory to write the results")
     parser.add_argument("--use-llm", action="store_true", help="Use OpenAI LLM for evaluation instead of heuristics")
     parser.add_argument("--model", default="gpt-3.5-turbo", help="Model name to use when calling the LLM")
+    parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers for grading")
     args = parser.parse_args()
 
     # Ensure output directory exists
@@ -349,7 +368,7 @@ def main() -> None:
             print(f"Skipping {filename}: failed to load JSON ({exc})", file=sys.stderr)
             continue
         try:
-            result = evaluate_submission(questions, submission, use_llm=args.use_llm, model=args.model)
+            result = evaluate_submission(questions, submission, use_llm=args.use_llm, model=args.model, workers=args.workers)
         except Exception as exc:
             print(f"Error evaluating {filename}: {exc}", file=sys.stderr)
             continue

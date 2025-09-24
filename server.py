@@ -16,6 +16,8 @@ from evaluate import (
 QUESTIONS_PATH = os.getenv("QUESTIONS_PATH", os.path.join(os.path.dirname(__file__), "questions.json"))
 RESULTS_DIR = os.getenv("RESULTS_DIR", os.path.join(os.path.dirname(__file__), "results"))
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+# Fixed number of parallel workers for grading
+FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 
 app = FastAPI(title="Ecoflex Auto Grader", version="1.0.0")
 
@@ -92,7 +94,13 @@ async def grade_submission(
         raise HTTPException(status_code=500, detail="Questions not loaded")
 
     try:
-        result = evaluate_submission(questions, submission, use_llm=use_llm, model=model)
+        result = evaluate_submission(
+            questions,
+            submission,
+            use_llm=use_llm,
+            model=model,
+            workers=FIXED_WORKERS,
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -168,7 +176,13 @@ async def grade_batch(
 
     for submission in submissions:
         try:
-            result = evaluate_submission(questions, submission, use_llm=use_llm, model=model)
+            result = evaluate_submission(
+                questions,
+                submission,
+                use_llm=use_llm,
+                model=model,
+                workers=FIXED_WORKERS,
+            )
             results.append(result)
         except Exception as exc:
             # Include error per submission
