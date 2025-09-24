@@ -321,17 +321,36 @@ def llm_evaluate_self_consistent(
     model: str,
     runs: int,
 ) -> Dict[str, Any]:
-    """Run multiple LLM evaluations with prompt variants and aggregate by median."""
+    """Run multiple LLM evaluations with prompt variants and aggregate by median.
+
+    Executes the variant calls in parallel using a thread pool, while the global
+    semaphore continues to enforce per-process OpenAI concurrency.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     runs = max(1, min(runs, 9))
     results: List[Dict[str, Any]] = []
-    for i in range(runs):
-        prompt = _build_prompt_variant(i, question, expected, answer)
-        try:
-            content = _call_openai_chat(prompt, model)
-            parsed = parse_response(content)
-            results.append(parsed)
-        except Exception:
-            continue
+
+    if runs == 1:
+        prompt = _build_prompt_variant(0, question, expected, answer)
+        content = _call_openai_chat(prompt, model)
+        parsed = parse_response(content)
+        results.append(parsed)
+    else:
+        max_workers = min(runs, _OPENAI_CONCURRENCY)
+        def _task(i: int) -> Optional[Dict[str, Any]]:
+            try:
+                p = _build_prompt_variant(i, question, expected, answer)
+                c = _call_openai_chat(p, model)
+                return parse_response(c)
+            except Exception:
+                return None
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(_task, i) for i in range(runs)]
+            for fut in as_completed(futures):
+                res = fut.result()
+                if res is not None:
+                    results.append(res)
     if not results:
         raise RuntimeError("All self-consistency runs failed")
     comp = [float(r.get("completeness", 0)) for r in results]
