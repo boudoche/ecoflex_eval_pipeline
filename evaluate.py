@@ -205,22 +205,22 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
     """
     variant = idx % 4
     if variant == 0:
-        return build_prompt(question, expected, participant)
+        return build_prompt(question, expected, participant) + "\n\nScores must be numeric on a 0-5 scale for each criterion."
     if variant == 1:
         return (
             "Evaluate the answer strictly per the rubric below and return only JSON.\n\n"
             + f"Participant answer: {participant}\n"
             + f"Expected answer: {expected}\n"
             + f"Question: {question}\n\n"
-            + "Keys: completeness, conciseness, correctness, comment."
+            + "Keys: completeness, conciseness, correctness, comment. Scores must be numeric 0-5."
         )
     if variant == 2:
         return (
-            "You are a careful grader. Score on a 0-5 scale for each criterion and justify briefly.\n\n"
+            "You are a careful grader. Score on a 0-5 numeric scale for each criterion and justify briefly.\n\n"
             + f"Question: {question}\n"
             + f"Participant answer: {participant}\n"
             + f"Expected answer: {expected}\n\n"
-            + "Return JSON with completeness, conciseness, correctness, comment."
+            + "Return JSON with completeness, conciseness, correctness, comment. Scores must be numbers in [0,5]."
         )
     # variant 3
     return (
@@ -228,7 +228,7 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
         + f"Expected answer: {expected}\n"
         + f"Question: {question}\n"
         + f"Participant answer: {participant}\n\n"
-        + "Fields: completeness, conciseness, correctness, comment."
+        + "Fields: completeness, conciseness, correctness, comment. Each score must be numeric 0-5."
     )
 
 
