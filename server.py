@@ -22,7 +22,7 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.1.1")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.1.2")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -30,7 +30,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # Mount static UI
@@ -127,7 +127,7 @@ async def grade_submission(
     use_llm: bool = Query(True, description="Use OpenAI LLM instead of heuristics"),
     model: str = Query(DEFAULT_MODEL, description="OpenAI model name when use_llm=true"),
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
-    x_submission_token: Optional[str] = Header(None, convert_underscores=False),
+    x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
     """
     Accept a single submission JSON and return graded results.
@@ -202,7 +202,7 @@ async def grade_batch(
     use_llm: bool = Query(True),
     model: str = Query(DEFAULT_MODEL),
     write_files: bool = Query(True),
-    x_submission_token: Optional[str] = Header(None, convert_underscores=False),
+    x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
     _, team = _require_token_and_team(x_submission_token)
 
