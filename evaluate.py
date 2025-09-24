@@ -36,6 +36,7 @@ except ImportError:
 
 
 DEFAULT_WEIGHTS: Tuple[float, float, float] = (0.3, 0.2, 0.5)
+MODEL_NAME = "gpt-4o-mini"
 
 
 def load_weights_from_env() -> Tuple[float, float, float]:
@@ -221,7 +222,7 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
     )
 
 
-def llm_evaluate(question: str, expected: str, answer: str, model: str = "gpt-3.5-turbo") -> Dict[str, Any]:
+def llm_evaluate(question: str, expected: str, answer: str, model: str = MODEL_NAME) -> Dict[str, Any]:
     """Call an OpenAI LLM to score a single answer."""
     if openai is None:
         raise RuntimeError("openai module is not installed; install openai or use heuristic mode")
@@ -262,19 +263,16 @@ def llm_evaluate_self_consistent(
             parsed = parse_response(content)
             results.append(parsed)
         except Exception as e:
-            # Skip failed run; continue with others
             continue
     if not results:
         raise RuntimeError("All self-consistency runs failed")
     comp = [float(r.get("completeness", 0)) for r in results]
     conc = [float(r.get("conciseness", 0)) for r in results]
     corr = [float(r.get("correctness", 0)) for r in results]
-    # Median aggregation to reduce outliers
     agg = {
         "completeness": round(float(median(comp)), 2),
         "conciseness": round(float(median(conc)), 2),
         "correctness": round(float(median(corr)), 2),
-        # Take the shortest comment to keep it brief
         "comment": sorted((r.get("comment", "") for r in results), key=lambda x: len(str(x)))[0] or "",
     }
     return agg
@@ -297,7 +295,7 @@ def evaluate_submission(
     questions: Dict[str, Dict[str, str]],
     submission: Dict[str, Any],
     use_llm: bool = False,
-    model: str = "gpt-3.5-turbo",
+    model: str = MODEL_NAME,
     workers: int = 1,
     weights: Optional[Tuple[float, float, float]] = None,
     sc_runs: int = 1,
@@ -372,7 +370,6 @@ def main() -> None:
     parser.add_argument("--submissions_dir", required=True, help="Directory containing participant submissions")
     parser.add_argument("--out_dir", required=True, help="Directory to write the results")
     parser.add_argument("--use-llm", action="store_true", help="Use OpenAI LLM for evaluation instead of heuristics")
-    parser.add_argument("--model", default="gpt-3.5-turbo", help="Model name to use when calling the LLM")
     parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers for grading")
     parser.add_argument("--weight-completeness", type=float, default=None, help="Weight for completeness")
     parser.add_argument("--weight-conciseness", type=float, default=None, help="Weight for conciseness")
@@ -380,17 +377,14 @@ def main() -> None:
     parser.add_argument("--sc-runs", type=int, default=int(os.getenv("SELF_CONSISTENCY_RUNS", "1")), help="Self-consistency runs (repeat LLM and aggregate)")
     args = parser.parse_args()
 
-    # Ensure output directory exists
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Load questions
     try:
         questions = load_questions(args.questions)
     except Exception as exc:
         print(f"Error loading questions: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    # Determine weights: CLI overrides env, then defaults
     if args.weight_completeness is not None or args.weight_conciseness is not None or args.weight_correctness is not None:
         c = args.weight_completeness if args.weight_completeness is not None else DEFAULT_WEIGHTS[0]
         z = args.weight_conciseness if args.weight_conciseness is not None else DEFAULT_WEIGHTS[1]
@@ -405,7 +399,6 @@ def main() -> None:
 
     summary_rows: List[Dict[str, Any]] = []
 
-    # Iterate over submissions
     for filename in sorted(os.listdir(args.submissions_dir)):
         if not filename.lower().endswith(".json"):
             continue
@@ -420,7 +413,7 @@ def main() -> None:
                 questions,
                 submission,
                 use_llm=args.use_llm,
-                model=args.model,
+                model=MODEL_NAME,
                 workers=args.workers,
                 weights=weights,
                 sc_runs=args.sc_runs,
@@ -429,7 +422,6 @@ def main() -> None:
             print(f"Error evaluating {filename}: {exc}", file=sys.stderr)
             continue
         write_results(result, args.out_dir)
-        # Build summary rows
         pid = result.get("participant_id") or "unknown"
         for q in result["questions"]:
             eval_data = q["evaluation"]
@@ -441,7 +433,6 @@ def main() -> None:
                 "correctness": eval_data["correctness"],
                 "score": eval_data["score"],
             })
-    # Write summary CSV
     append_summary(summary_rows, args.out_dir)
 
     print(f"Evaluation complete. Results written to {args.out_dir}")

@@ -15,14 +15,15 @@ from evaluate import (
 
 QUESTIONS_PATH = os.getenv("QUESTIONS_PATH", os.path.join(os.path.dirname(__file__), "questions.json"))
 RESULTS_DIR = os.getenv("RESULTS_DIR", os.path.join(os.path.dirname(__file__), "results"))
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+# Fixed OpenAI model
+DEFAULT_MODEL = "gpt-4o-mini"
 # Fixed number of parallel workers for grading
 FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 # Token sources
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.1.2")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.2.0")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -55,7 +56,6 @@ def _ensure_results_dir() -> None:
 
 def _load_tokens() -> Dict[str, str]:
     mapping: Dict[str, str] = {}
-    # From env TEAM_TOKENS
     env_value = os.getenv("TEAM_TOKENS", TEAM_TOKENS)
     if env_value:
         parts = [p.strip() for p in env_value.split(",") if p.strip()]
@@ -66,7 +66,6 @@ def _load_tokens() -> Dict[str, str]:
                 team = team.strip()
                 if token:
                     mapping[token] = team
-    # From file TOKENS_PATH (JSON object {token: team})
     path_value = os.getenv("TOKENS_PATH", TOKENS_PATH)
     if os.path.isfile(path_value):
         try:
@@ -125,19 +124,9 @@ async def reload_tokens() -> Dict[str, int]:
 async def grade_submission(
     submission: Dict[str, Any],
     use_llm: bool = Query(True, description="Use OpenAI LLM instead of heuristics"),
-    model: str = Query(DEFAULT_MODEL, description="OpenAI model name when use_llm=true"),
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
-    """
-    Accept a single submission JSON and return graded results.
-
-    Expected payload format:
-    {
-      "participant_id": "TeamName",  # will be overridden by token mapping
-      "answers": [ {"question_id": "Q1", "answer": "..."}, ... ]
-    }
-    """
     _, team = _require_token_and_team(x_submission_token)
 
     questions = _state.get("questions") or {}
@@ -152,7 +141,7 @@ async def grade_submission(
             questions,
             submission,
             use_llm=use_llm,
-            model=model,
+            model=DEFAULT_MODEL,
             workers=FIXED_WORKERS,
         )
     except Exception as exc:
@@ -200,7 +189,6 @@ async def grade_submission(
 async def grade_batch(
     submissions: List[Dict[str, Any]],
     use_llm: bool = Query(True),
-    model: str = Query(DEFAULT_MODEL),
     write_files: bool = Query(True),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
@@ -234,7 +222,7 @@ async def grade_batch(
                 questions,
                 sub,
                 use_llm=use_llm,
-                model=model,
+                model=DEFAULT_MODEL,
                 workers=FIXED_WORKERS,
             )
             results.append(result)
