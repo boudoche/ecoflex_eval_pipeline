@@ -216,7 +216,14 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
     """
     variant = idx % 4
     if variant == 0:
-        return build_prompt(question, expected, participant) + "\n\nScores must be numeric on a 0-5 scale for each criterion."
+        return (
+            build_prompt(question, expected, participant)
+            + "\n\nScores must be numeric on a 0-5 scale for each criterion."
+            + "\nOutput exactly one JSON object with this exact shape (no extra keys):"
+            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+            + "\nDo not nest objects (no {\"score\":..., \"justification\":...}); place justification only in 'comment'."
+            + "\nDo not include code fences or any text before or after the JSON."
+        )
     if variant == 1:
         return (
             "Evaluate the answer strictly per the rubric below and return only JSON.\n\n"
@@ -224,6 +231,9 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
             + f"Expected answer: {expected}\n"
             + f"Question: {question}\n\n"
             + "Keys: completeness, conciseness, correctness, comment. Scores must be numeric 0-5."
+            + "\nReturn exactly this JSON shape (no extra keys):"
+            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+            + "\nNo nested objects, no arrays, no code fences, no prose outside the JSON."
         )
     if variant == 2:
         return (
@@ -232,6 +242,10 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
             + f"Participant answer: {participant}\n"
             + f"Expected answer: {expected}\n\n"
             + "Return JSON with completeness, conciseness, correctness, comment. Scores must be numbers in [0,5]."
+            + "\nFormat (exact keys, no extras):"
+            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+            + "\nDo not return nested objects like {\"score\":..., \"justification\":...}."
+            + "\nDo not include code fences or any text outside the JSON."
         )
     # variant 3
     return (
@@ -240,6 +254,9 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
         + f"Question: {question}\n"
         + f"Participant answer: {participant}\n\n"
         + "Fields: completeness, conciseness, correctness, comment. Each score must be numeric 0-5."
+        + "\nExact output JSON (no extra keys, no nesting):"
+        + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+        + "\nNo code fences, no prose before/after."
     )
 
 
