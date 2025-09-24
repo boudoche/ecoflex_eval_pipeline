@@ -22,7 +22,7 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.1.0")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.1.1")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -56,8 +56,9 @@ def _ensure_results_dir() -> None:
 def _load_tokens() -> Dict[str, str]:
     mapping: Dict[str, str] = {}
     # From env TEAM_TOKENS
-    if TEAM_TOKENS:
-        parts = [p.strip() for p in TEAM_TOKENS.split(",") if p.strip()]
+    env_value = os.getenv("TEAM_TOKENS", TEAM_TOKENS)
+    if env_value:
+        parts = [p.strip() for p in env_value.split(",") if p.strip()]
         for part in parts:
             if ":" in part:
                 token, team = part.split(":", 1)
@@ -66,10 +67,11 @@ def _load_tokens() -> Dict[str, str]:
                 if token:
                     mapping[token] = team
     # From file TOKENS_PATH (JSON object {token: team})
-    if os.path.isfile(TOKENS_PATH):
+    path_value = os.getenv("TOKENS_PATH", TOKENS_PATH)
+    if os.path.isfile(path_value):
         try:
             import json
-            with open(TOKENS_PATH, "r", encoding="utf-8") as f:
+            with open(path_value, "r", encoding="utf-8") as f:
                 data = json.load(f)
             for token, team in data.items():
                 if isinstance(token, str) and isinstance(team, str):
@@ -112,6 +114,13 @@ async def reload_questions() -> Dict[str, str]:
         raise HTTPException(status_code=400, detail=f"Failed to reload questions: {exc}")
 
 
+@app.post("/reload-tokens")
+async def reload_tokens() -> Dict[str, int]:
+    mapping = _load_tokens()
+    _state["token_to_team"] = mapping
+    return {"loaded": len(mapping)}
+
+
 @app.post("/grade")
 async def grade_submission(
     submission: Dict[str, Any],
@@ -135,7 +144,6 @@ async def grade_submission(
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
 
-    # Enforce participant_id from token mapping
     submission = dict(submission)
     submission["participant_id"] = team
 
@@ -153,7 +161,6 @@ async def grade_submission(
     if write_files:
         try:
             write_results(result, RESULTS_DIR)
-            # Also append/update summary.csv: re-generate for this single result
             from csv import DictWriter
             csv_path = os.path.join(RESULTS_DIR, "summary.csv")
             fieldnames = [
@@ -220,7 +227,6 @@ async def grade_batch(
         all_rows: List[Dict[str, Any]] = []
 
     for submission in submissions:
-        # Enforce participant_id from token mapping
         sub = dict(submission)
         sub["participant_id"] = team
         try:
