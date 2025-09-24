@@ -27,6 +27,20 @@ to 5, where 0 is worst and 5 is best:
 • Correctness: Are the facts in the participant's answer correct relative to
   the expected answer?  Penalise incorrect statements and hallucinations.
 
+Scoring anchors (examples for calibration):
+- Completeness (0 / 3 / 5)
+  • 0: Mentions almost none of the required points.
+  • 3: Covers about half of the key points; notable gaps remain.
+  • 5: Covers essentially all key points with no substantive omissions.
+- Conciseness (0 / 3 / 5)
+  • 0: Highly verbose or rambling; includes lots of irrelevant details.
+  • 3: Some extra wording, minor repetition, but generally to the point.
+  • 5: Clear, compact phrasing without fluff or redundancy.
+- Correctness (0 / 3 / 5)
+  • 0: Contains major factual errors or contradicts the expected answer.
+  • 3: Mostly correct with one or two minor inaccuracies.
+  • 5: Factually accurate and aligned with the expected answer.
+
 You MUST return your evaluation as a JSON object with exactly the keys
 "completeness", "conciseness", "correctness", and "comment".  The values of
 "completeness", "conciseness", and "correctness" must be numbers between 0
