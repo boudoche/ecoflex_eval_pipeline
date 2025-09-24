@@ -36,6 +36,8 @@
     .file-list { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
     .file-chip { display: inline-flex; align-items: center; gap: 0.5rem; background: #ffffff; border: 1px solid #e5e7eb; color: #374151; padding: 0.35rem 0.6rem; border-radius: 9999px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); font-size: 0.9rem; }
     .file-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; }
+    .file-close { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; background: #f3f4f6; color: #6b7280; cursor: pointer; border: 1px solid #e5e7eb; font-size: 12px; line-height: 1; }
+    .file-close:hover { background: #e5e7eb; }
   </style>
 </head>
 <body>
@@ -81,6 +83,16 @@
       message.className = 'msg hidden';
     }
 
+    function clearFileSelection() {
+      payload = null;
+      submitBtn.disabled = true;
+      fileInput.value = '';
+      fileList.innerHTML = '';
+      fileList.classList.add('hidden');
+      showMessage('');
+      clearMessage();
+    }
+
     function showFileChip(name) {
       fileList.innerHTML = '';
       const chip = document.createElement('div');
@@ -89,8 +101,18 @@
       dot.className = 'file-dot';
       const text = document.createElement('span');
       text.textContent = name;
+      const close = document.createElement('button');
+      close.className = 'file-close';
+      close.setAttribute('type', 'button');
+      close.setAttribute('aria-label', 'Remove file');
+      close.textContent = '×';
+      close.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearFileSelection();
+      });
       chip.appendChild(dot);
       chip.appendChild(text);
+      chip.appendChild(close);
       fileList.appendChild(chip);
       fileList.classList.remove('hidden');
     }
