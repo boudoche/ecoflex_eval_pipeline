@@ -115,7 +115,9 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
 - Health check: `GET /health`
-- Grade one submission: `POST /grade` with JSON body `{ "participant_id": "Team42", "answers": [ {"question_id": "Q1", "answer": "..."} ] }`
+- Grade one submission: `POST /grade` with JSON body `{ "answers": [ {"question_id": "Q1", "answer": "..."} ] }`
+- Required header: `X-Submission-Token: <team_token>`
+- Server enforces `participant_id` from the token mapping.
 - Results are written to `results/` and `results/summary.csv` by default. Configure with env vars:
   - `QUESTIONS_PATH` (default: `questions.json`)
   - `RESULTS_DIR` (default: `./results`)
@@ -126,6 +128,23 @@ Server behavior:
 - Uses a fixed concurrency for grading (default 6 workers). Set `FIXED_WORKERS` env to adjust server‑side.
 - Supports self‑consistency via env: `SELF_CONSISTENCY_RUNS` (e.g., 3).
 - Supports scoring weights via env: `WEIGHT_COMPLETENESS`, `WEIGHT_CONCISENESS`, `WEIGHT_CORRECTNESS`.
+- Requires a submission token header; maps token → team.
+
+### Token Management
+
+Configure tokens either via environment or a JSON file:
+
+- Env variable `TEAM_TOKENS` with comma‑separated `token:TeamName` pairs:
+  ```bash
+  export TEAM_TOKENS="tokA:TeamA,tokB:TeamB"
+  ```
+- Or a JSON file (path via `TOKENS_PATH`, default `./tokens.json`), format:
+  ```json
+  { "tokA": "TeamA", "tokB": "TeamB" }
+  ```
+The server loads both sources at startup; file values override duplicates from env.
+
+UI usage: the page at `/ui` has a token field. The token is sent as `X-Submission-Token` header.
 
 ### Deploy on AWS EC2 (quick start)
 
@@ -142,46 +161,11 @@ Server behavior:
    export QUESTIONS_PATH=$(pwd)/questions.json
    export RESULTS_DIR=$(pwd)/results
    mkdir -p "$RESULTS_DIR"
-   # Required for LLM mode
    export OPENAI_API_KEY=sk-...yourkey...
+   export TEAM_TOKENS="tokA:TeamA,tokB:TeamB"  # or provide TOKENS_PATH JSON
    ```
-4. Run the server via systemd (auto‑restart on boot/crash). Example unit file (`/etc/systemd/system/ecoflex.service`):
-   ```ini
-   [Unit]
-   Description=Ecoflex Grader API
-   After=network.target
-   [Service]
-   User=ubuntu
-   WorkingDirectory=/home/ubuntu/ecoflex_eval_pipeline
-   EnvironmentFile=/etc/ecoflex.env
-   ExecStart=/home/ubuntu/ecoflex_eval_pipeline/.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000
-   Restart=always
-   RestartSec=3
-   [Install]
-   WantedBy=multi-user.target
-   ```
-   Example env file (`/etc/ecoflex.env`):
-   ```bash
-   QUESTIONS_PATH=/home/ubuntu/ecoflex_eval_pipeline/questions.json
-   RESULTS_DIR=/home/ubuntu/ecoflex_eval_pipeline/results
-   OPENAI_MODEL=gpt-3.5-turbo
-   # Required for LLM
-   OPENAI_API_KEY=sk-...yourkey...
-   # Scoring weights (normalized)
-   WEIGHT_COMPLETENESS=0.3
-   WEIGHT_CONCISENESS=0.2
-   WEIGHT_CORRECTNESS=0.5
-   # Self‑consistency runs
-   SELF_CONSISTENCY_RUNS=3
-   # Fixed parallel workers
-   FIXED_WORKERS=6
-   ```
-   Enable and start:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now ecoflex
-   ```
-5. (Optional) Reverse proxy with Nginx on port 80/443 and enable TLS via Certbot. For a temporary DNS, you can use `sslip.io` (e.g., `54-xx-xx-xx-xx.sslip.io`).
+4. Run the server via systemd (auto‑restart on boot/crash). Example unit file and env file shown earlier. Ensure `TEAM_TOKENS` or `TOKENS_PATH` is present in `/etc/ecoflex.env`.
+5. (Optional) Reverse proxy with Nginx on port 80/443 and enable TLS via Certbot (e.g., using a temporary dns like `54-xx-xx-xx-xx.sslip.io`).
 
 ## Evaluation & Grading Details
 
@@ -202,15 +186,14 @@ A lightweight token‑based heuristic computes all three scores without calling 
 
 ### LLM mode
 
-- The prompt includes a clear rubric and now also 0/3/5 **calibration anchors** to stabilize the scale.
-- Optional **self‑consistency**: the evaluator can call the LLM multiple times with small prompt variations and aggregate the median per criterion to reduce variance from single‑shot runs.
-- Temperature is set to 0.0 to minimize randomness.
+- The prompt includes a clear rubric and 0/3/5 **calibration anchors** to stabilize the scale.
+- Optional **self‑consistency** aggregates multiple LLM runs by median.
+- Temperature is 0.0 to minimize randomness.
 
 ### Parallelization
 
 - Within a single submission, answers are graded concurrently (thread pool).
 - In the API server, a fixed number of workers is used by default (configurable via `FIXED_WORKERS`).
-- Be mindful of API provider rate limits when increasing concurrency/self‑consistency runs.
 
 ### Outputs
 
@@ -223,7 +206,6 @@ Participants should submit a JSON file with the following structure:
 
 ```json
 {
-  "participant_id": "TeamName",
   "answers": [
     { "question_id": "Q34", "answer": "..." },
     { "question_id": "Q35", "answer": "..." }
@@ -231,7 +213,7 @@ Participants should submit a JSON file with the following structure:
 }
 ```
 
-Each `question_id` must correspond to an entry in `questions.json`.
+The server derives `participant_id` from the submission token.
 
 ## License
 

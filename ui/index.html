@@ -24,18 +24,25 @@
     .msg { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 10px; max-width: 680px; }
     .ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
     .err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-    .row { margin-top: 0.75rem; }
+    .row { margin-top: 0.75rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
     button { background: #2563eb; color: white; border: 0; padding: 0.6rem 1.1rem; border-radius: 10px; cursor: pointer; }
     button:disabled { background: #93c5fd; cursor: not-allowed; }
     input[type="file"] { display: none; }
     .link { color: #2563eb; text-decoration: underline; cursor: pointer; }
+    input[type="text"] { padding: 0.5rem 0.6rem; border: 1px solid #d1d5db; border-radius: 8px; width: 320px; }
+    label { font-size: 0.9rem; color: #374151; }
   </style>
 </head>
 <body>
   <h1>Submit your answers</h1>
-  <div class="sub">Drop your JSON file below to submit. You’ll see a confirmation when complete.</div>
+  <div class="sub">Drop your JSON file below to submit. Provide the submission token you received.</div>
 
-  <div id="dropzone" class="dropzone">
+  <div class="row">
+    <label for="token">Submission token</label>
+    <input id="token" type="text" placeholder="Paste your token" autocomplete="off" />
+  </div>
+
+  <div id="dropzone" class="dropzone" style="margin-top: 0.75rem;">
     Drag & drop your JSON file here
     <div class="note">or <span id="browse" class="link">choose a file</span></div>
     <input id="fileInput" type="file" accept="application/json,.json" />
@@ -53,6 +60,7 @@
     const browse = document.getElementById('browse');
     const submitBtn = document.getElementById('submitBtn');
     const message = document.getElementById('message');
+    const tokenEl = document.getElementById('token');
 
     let payload = null;
 
@@ -103,17 +111,25 @@
 
     submitBtn.addEventListener('click', async () => {
       if (!payload) return;
+      clearMessage();
+      const token = (tokenEl.value || '').trim();
+      if (!token) { showMessage('Submission token is required.', false); return; }
       submitBtn.disabled = true;
       showMessage('Submitting...');
       try {
         const params = new URLSearchParams({ use_llm: 'true', model: 'gpt-3.5-turbo', write_files: 'true' });
         const res = await fetch(`/grade?${params.toString()}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Submission-Token': token,
+          },
           body: JSON.stringify(payload),
         });
         if (res.ok) {
           showMessage('Submission complete.');
+        } else if (res.status === 401) {
+          showMessage('Invalid or missing token.', false);
         } else {
           showMessage('Submission failed. Please try again.', false);
         }

@@ -1,7 +1,7 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -18,8 +18,11 @@ RESULTS_DIR = os.getenv("RESULTS_DIR", os.path.join(os.path.dirname(__file__), "
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
 # Fixed number of parallel workers for grading
 FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
+# Token sources
+TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
+TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.0.0")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.1.0")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -42,11 +45,47 @@ async def root_redirect() -> RedirectResponse:
 # In-memory state
 _state: Dict[str, Any] = {
     "questions": {},
+    "token_to_team": {},
 }
 
 
 def _ensure_results_dir() -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def _load_tokens() -> Dict[str, str]:
+    mapping: Dict[str, str] = {}
+    # From env TEAM_TOKENS
+    if TEAM_TOKENS:
+        parts = [p.strip() for p in TEAM_TOKENS.split(",") if p.strip()]
+        for part in parts:
+            if ":" in part:
+                token, team = part.split(":", 1)
+                token = token.strip()
+                team = team.strip()
+                if token:
+                    mapping[token] = team
+    # From file TOKENS_PATH (JSON object {token: team})
+    if os.path.isfile(TOKENS_PATH):
+        try:
+            import json
+            with open(TOKENS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for token, team in data.items():
+                if isinstance(token, str) and isinstance(team, str):
+                    mapping[token] = team
+        except Exception:
+            pass
+    return mapping
+
+
+def _require_token_and_team(x_submission_token: Optional[str]) -> Tuple[str, str]:
+    if not x_submission_token:
+        raise HTTPException(status_code=401, detail="Missing submission token")
+    team = _state["token_to_team"].get(x_submission_token)
+    if not team:
+        raise HTTPException(status_code=401, detail="Invalid submission token")
+    return x_submission_token, team
 
 
 @app.on_event("startup")
@@ -55,8 +94,8 @@ async def startup_event() -> None:
     try:
         _state["questions"] = load_questions(QUESTIONS_PATH)
     except Exception as exc:
-        # Fail fast if questions are unavailable
         raise RuntimeError(f"Failed to load questions from {QUESTIONS_PATH}: {exc}")
+    _state["token_to_team"] = _load_tokens()
 
 
 @app.get("/health")
@@ -79,19 +118,26 @@ async def grade_submission(
     use_llm: bool = Query(True, description="Use OpenAI LLM instead of heuristics"),
     model: str = Query(DEFAULT_MODEL, description="OpenAI model name when use_llm=true"),
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
+    x_submission_token: Optional[str] = Header(None, convert_underscores=False),
 ) -> Dict[str, Any]:
     """
     Accept a single submission JSON and return graded results.
 
     Expected payload format:
     {
-      "participant_id": "TeamName",
+      "participant_id": "TeamName",  # will be overridden by token mapping
       "answers": [ {"question_id": "Q1", "answer": "..."}, ... ]
     }
     """
+    _, team = _require_token_and_team(x_submission_token)
+
     questions = _state.get("questions") or {}
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
+
+    # Enforce participant_id from token mapping
+    submission = dict(submission)
+    submission["participant_id"] = team
 
     try:
         result = evaluate_submission(
@@ -132,27 +178,27 @@ async def grade_submission(
                         "score": eval_data["score"],
                     }
                 )
-            # Overwrite per-request, simple behavior; for multi-tenant use, consider append with dedup
             with open(csv_path, "w", newline="", encoding="utf-8") as fh:
                 writer = DictWriter(fh, fieldnames=fieldnames)
                 writer.writeheader()
                 for r in rows:
                     writer.writerow(r)
         except Exception as exc:
-            # Do not fail the API if disk write fails
             raise HTTPException(status_code=500, detail=f"Failed to write results: {exc}")
 
     return result
 
 
-# Optional: batch grading endpoint
 @app.post("/grade-batch")
 async def grade_batch(
     submissions: List[Dict[str, Any]],
     use_llm: bool = Query(True),
     model: str = Query(DEFAULT_MODEL),
     write_files: bool = Query(True),
+    x_submission_token: Optional[str] = Header(None, convert_underscores=False),
 ) -> Dict[str, Any]:
+    _, team = _require_token_and_team(x_submission_token)
+
     questions = _state.get("questions") or {}
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
@@ -171,22 +217,23 @@ async def grade_batch(
             "correctness",
             "score",
         ]
-        # Rebuild summary from this batch only
         all_rows: List[Dict[str, Any]] = []
 
     for submission in submissions:
+        # Enforce participant_id from token mapping
+        sub = dict(submission)
+        sub["participant_id"] = team
         try:
             result = evaluate_submission(
                 questions,
-                submission,
+                sub,
                 use_llm=use_llm,
                 model=model,
                 workers=FIXED_WORKERS,
             )
             results.append(result)
         except Exception as exc:
-            # Include error per submission
-            results.append({"participant_id": submission.get("participant_id", "unknown"), "error": str(exc)})
+            results.append({"participant_id": sub.get("participant_id", "unknown"), "error": str(exc)})
             continue
 
         if write_files:
