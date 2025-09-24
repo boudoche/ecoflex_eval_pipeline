@@ -179,6 +179,9 @@ async def grade_submission(
     sub = dict(sub)
     sub["participant_id"] = team
 
+    if use_llm and not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=400, detail="Missing OPENAI_API_KEY on server. Set it or call with use_llm=false.")
+
     try:
         result = await _run_in_executor(
             evaluate_submission,
@@ -280,6 +283,9 @@ async def grade_batch(
             continue
         sub = dict(sub)
         sub["participant_id"] = team
+        if use_llm and not os.getenv("OPENAI_API_KEY"):
+            results.append({"participant_id": sub.get("participant_id", "unknown"), "error": "Missing OPENAI_API_KEY on server. Set it or call with use_llm=false."})
+            continue
         try:
             result = await _run_in_executor(
                 evaluate_submission,

@@ -177,7 +177,12 @@
         } else if (res.status === 401) {
           showMessage('Invalid or missing token.', false);
         } else {
-          showMessage('Submission failed. Please try again.', false);
+          let errText = 'Submission failed. Please try again.';
+          try {
+            const data = await res.json();
+            if (data && data.detail) errText = data.detail;
+          } catch {}
+          showMessage(errText, false);
         }
       } catch (e) {
         showMessage('Network error. Please try again.', false);
