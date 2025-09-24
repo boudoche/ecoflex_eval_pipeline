@@ -53,6 +53,12 @@ DEFAULT_SC_RUNS = int(os.getenv("SELF_CONSISTENCY_RUNS", "3"))
 LLM_LOG_RESPONSES = os.getenv("LLM_LOG_RESPONSES", "").lower() in ("1", "true", "yes", "on")
 _LLM_LOGGER = logging.getLogger("ecoflex.llm")
 
+# Optional file logging for full LLM responses
+LLM_LOG_TO_FILE = os.getenv("LLM_LOG_TO_FILE", "").lower() in ("1", "true", "yes", "on")
+_RESULTS_DIR_DEFAULT = os.getenv("RESULTS_DIR", os.path.join(os.path.dirname(__file__), "results"))
+LLM_LOG_FILE = os.getenv("LLM_LOG_FILE", os.path.join(_RESULTS_DIR_DEFAULT, "llm_responses.log"))
+_LLM_FILE_LOCK = threading.Lock()
+
 
 def load_weights_from_env() -> Tuple[float, float, float]:
     """Load scoring weights from environment variables if set, else defaults.
@@ -261,6 +267,17 @@ def _call_openai_chat(prompt: str, model: str) -> str:
                     _LLM_LOGGER.info("LLM model=%s response=%s", model, content)
                 else:
                     _LLM_LOGGER.debug("LLM model=%s response=%s", model, content)
+                if LLM_LOG_TO_FILE:
+                    try:
+                        os.makedirs(os.path.dirname(LLM_LOG_FILE), exist_ok=True)
+                        with _LLM_FILE_LOCK:
+                            with open(LLM_LOG_FILE, "a", encoding="utf-8") as fh:
+                                fh.write(f"\n=== LLM RESPONSE | model={model} | ts={time.time()} ===\n")
+                                fh.write(content)
+                                fh.write("\n=== END LLM RESPONSE ===\n")
+                    except Exception:
+                        # Do not fail the call if logging to file fails
+                        pass
                 return content
             except Exception as e:
                 # Backoff on transient errors (rate limit, 5xx, network)
