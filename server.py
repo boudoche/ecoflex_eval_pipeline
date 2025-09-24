@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Query, Header
+from fastapi import FastAPI, HTTPException, Query, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -25,7 +25,7 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.3.1")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.3.2")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -159,7 +159,7 @@ def _coerce_submission_shape(obj: Any) -> Dict[str, Any]:
 
 @app.post("/grade")
 async def grade_submission(
-    submission: Any,
+    request: Request,
     use_llm: bool = Query(True, description="Use OpenAI LLM instead of heuristics"),
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
@@ -170,7 +170,12 @@ async def grade_submission(
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
 
-    sub = _coerce_submission_shape(submission)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    sub = _coerce_submission_shape(body)
     sub = dict(sub)
     sub["participant_id"] = team
 
@@ -234,7 +239,7 @@ async def grade_submission(
 
 @app.post("/grade-batch")
 async def grade_batch(
-    submissions: List[Any],
+    request: Request,
     use_llm: bool = Query(True),
     write_files: bool = Query(True),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
@@ -244,6 +249,13 @@ async def grade_batch(
     questions = _state.get("questions") or {}
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
+
+    try:
+        items = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="Batch body must be a JSON array of submissions")
 
     results: List[Dict[str, Any]] = []
 
@@ -260,7 +272,7 @@ async def grade_batch(
         ]
         all_rows: List[Dict[str, Any]] = []
 
-    for item in submissions:
+    for item in items:
         try:
             sub = _coerce_submission_shape(item)
         except HTTPException as he:
