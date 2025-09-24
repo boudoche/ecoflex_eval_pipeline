@@ -290,11 +290,22 @@ def llm_evaluate_self_consistent(
     comp = [float(r.get("completeness", 0)) for r in results]
     conc = [float(r.get("conciseness", 0)) for r in results]
     corr = [float(r.get("correctness", 0)) for r in results]
+    m_comp = float(median(comp))
+    m_conc = float(median(conc))
+    m_corr = float(median(corr))
+    # Choose the comment from the run whose scores are closest to the medians
+    def dist(i: int) -> float:
+        ri = results[i]
+        return abs(float(ri.get("completeness", 0)) - m_comp) \
+             + abs(float(ri.get("conciseness", 0)) - m_conc) \
+             + abs(float(ri.get("correctness", 0)) - m_corr)
+    best_idx = min(range(len(results)), key=dist)
+    chosen_comment = results[best_idx].get("comment", "")
     agg = {
-        "completeness": round(float(median(comp)), 2),
-        "conciseness": round(float(median(conc)), 2),
-        "correctness": round(float(median(corr)), 2),
-        "comment": sorted((r.get("comment", "") for r in results), key=lambda x: len(str(x)))[0] or "",
+        "completeness": m_comp,
+        "conciseness": m_conc,
+        "correctness": m_corr,
+        "comment": chosen_comment,
     }
     return agg
 
