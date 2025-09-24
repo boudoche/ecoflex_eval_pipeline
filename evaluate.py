@@ -234,7 +234,7 @@ def evaluate_submission(
     questions: Dict[str, Dict[str, str]],
     submission: Dict[str, Any],
     use_llm: bool = False,
-    model: str = "gpt-3.5-turbo",
+    model: str = "gpt-4o-mini",
 ) -> Dict[str, Any]:
     """Evaluate all answers from a single participant submission.
 
