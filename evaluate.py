@@ -23,7 +23,7 @@ import csv
 import json
 import os
 import sys
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple, Optional
 
 from prompts import build_prompt, parse_response
 
@@ -32,6 +32,32 @@ try:
     import openai  # type: ignore
 except ImportError:
     openai = None  # type: ignore
+
+
+DEFAULT_WEIGHTS: Tuple[float, float, float] = (0.3, 0.2, 0.5)
+
+
+def load_weights_from_env() -> Tuple[float, float, float]:
+    """Load scoring weights from environment variables if set, else defaults.
+
+    Env vars: WEIGHT_COMPLETENESS, WEIGHT_CONCISENESS, WEIGHT_CORRECTNESS.
+    If provided and the sum is > 0, weights are normalized to sum to 1.0.
+    """
+    wc = os.getenv("WEIGHT_COMPLETENESS")
+    wz = os.getenv("WEIGHT_CONCISENESS")
+    wr = os.getenv("WEIGHT_CORRECTNESS")
+    if wc is None and wz is None and wr is None:
+        return DEFAULT_WEIGHTS
+    try:
+        c = float(wc) if wc is not None else DEFAULT_WEIGHTS[0]
+        z = float(wz) if wz is not None else DEFAULT_WEIGHTS[1]
+        r = float(wr) if wr is not None else DEFAULT_WEIGHTS[2]
+    except Exception:
+        return DEFAULT_WEIGHTS
+    s = c + z + r
+    if s <= 0:
+        return DEFAULT_WEIGHTS
+    return (c / s, z / s, r / s)
 
 
 def load_questions(path: str) -> Dict[str, Dict[str, str]]:
@@ -207,26 +233,16 @@ def llm_evaluate(question: str, expected: str, answer: str, model: str = "gpt-3.
     return parse_response(content)
 
 
-def weighted_score(evaluation: Dict[str, float]) -> float:
+def weighted_score(evaluation: Dict[str, float], weights: Tuple[float, float, float]) -> float:
     """Compute a weighted score from the individual criteria.
 
-    The default weights are: completeness 30%, conciseness 20%, correctness
-    50%.  The result is rounded to two decimal places.
-
-    Parameters
-    ----------
-    evaluation : dict
-        A dict with keys "completeness", "conciseness", "correctness".
-
-    Returns
-    -------
-    float
-        The weighted score between 0 and 5.
+    Weights order: (completeness, conciseness, correctness). Result in [0, 5].
     """
     cpl = evaluation["completeness"]
     ccs = evaluation["conciseness"]
     crt = evaluation["correctness"]
-    score = 0.3 * cpl + 0.2 * ccs + 0.5 * crt
+    c_w, z_w, r_w = weights
+    score = c_w * cpl + z_w * ccs + r_w * crt
     return round(score, 2)
 
 
@@ -236,6 +252,7 @@ def evaluate_submission(
     use_llm: bool = False,
     model: str = "gpt-3.5-turbo",
     workers: int = 1,
+    weights: Optional[Tuple[float, float, float]] = None,
 ) -> Dict[str, Any]:
     """Evaluate all answers from a single participant submission.
 
@@ -251,6 +268,8 @@ def evaluate_submission(
         The OpenAI model to use when calling the LLM.  Defaults to "gpt-3.5-turbo".
     workers : int, optional
         Number of parallel workers.  1 means sequential. Defaults to 1.
+    weights : (float, float, float), optional
+        Weights for (completeness, conciseness, correctness). Defaults to env/defaults.
 
     Returns
     -------
@@ -260,6 +279,7 @@ def evaluate_submission(
     """
     participant_id = submission.get("participant_id") or "unknown"
     answers_list = list(submission.get("answers", []))
+    effective_weights = weights if weights is not None else load_weights_from_env()
 
     def process_one(item: Dict[str, Any]) -> Dict[str, Any]:
         qid = item.get("question_id")
@@ -273,7 +293,7 @@ def evaluate_submission(
             evaluation = llm_evaluate(q_text, expected, ans_text, model=model)
         else:
             evaluation = heuristic_evaluate(expected, ans_text)
-        evaluation["score"] = weighted_score(evaluation)
+        evaluation["score"] = weighted_score(evaluation, effective_weights)
         return {"question_id": qid, "evaluation": evaluation}
 
     results_questions: List[Dict[str, Any]] = []
@@ -343,6 +363,9 @@ def main() -> None:
     parser.add_argument("--use-llm", action="store_true", help="Use OpenAI LLM for evaluation instead of heuristics")
     parser.add_argument("--model", default="gpt-3.5-turbo", help="Model name to use when calling the LLM")
     parser.add_argument("--workers", type=int, default=1, help="Number of parallel workers for grading")
+    parser.add_argument("--weight-completeness", type=float, default=None, help="Weight for completeness")
+    parser.add_argument("--weight-conciseness", type=float, default=None, help="Weight for conciseness")
+    parser.add_argument("--weight-correctness", type=float, default=None, help="Weight for correctness")
     args = parser.parse_args()
 
     # Ensure output directory exists
@@ -354,6 +377,19 @@ def main() -> None:
     except Exception as exc:
         print(f"Error loading questions: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    # Determine weights: CLI overrides env, then defaults
+    if args.weight_completeness is not None or args.weight_conciseness is not None or args.weight_correctness is not None:
+        c = args.weight_completeness if args.weight_completeness is not None else DEFAULT_WEIGHTS[0]
+        z = args.weight_conciseness if args.weight_conciseness is not None else DEFAULT_WEIGHTS[1]
+        r = args.weight_correctness if args.weight_correctness is not None else DEFAULT_WEIGHTS[2]
+        s = c + z + r
+        if s <= 0:
+            weights = DEFAULT_WEIGHTS
+        else:
+            weights = (c / s, z / s, r / s)
+    else:
+        weights = load_weights_from_env()
 
     summary_rows: List[Dict[str, Any]] = []
 
@@ -368,7 +404,14 @@ def main() -> None:
             print(f"Skipping {filename}: failed to load JSON ({exc})", file=sys.stderr)
             continue
         try:
-            result = evaluate_submission(questions, submission, use_llm=args.use_llm, model=args.model, workers=args.workers)
+            result = evaluate_submission(
+                questions,
+                submission,
+                use_llm=args.use_llm,
+                model=args.model,
+                workers=args.workers,
+                weights=weights,
+            )
         except Exception as exc:
             print(f"Error evaluating {filename}: {exc}", file=sys.stderr)
             continue
