@@ -23,6 +23,7 @@ import csv
 import json
 import os
 import sys
+from statistics import median
 from typing import Dict, Any, List, Tuple, Optional
 
 from prompts import build_prompt, parse_response
@@ -186,40 +187,45 @@ def heuristic_evaluate(expected: str, answer: str) -> Dict[str, Any]:
     }
 
 
-def llm_evaluate(question: str, expected: str, answer: str, model: str = "gpt-3.5-turbo") -> Dict[str, Any]:
-    """Call an OpenAI LLM to score a single answer.
+def _build_prompt_variant(idx: int, question: str, expected: str, participant: str) -> str:
+    """Return a slightly varied prompt to promote self-consistency.
 
-    This function builds a prompt using the rubric and sends it to the
-    specified model.  It then parses the JSON result.  You must set
-    OPENAI_API_KEY in the environment for openai to work.
-
-    Parameters
-    ----------
-    question : str
-        The question text.
-    expected : str
-        The expected answer text.
-    answer : str
-        The participant's answer text.
-    model : str, optional
-        The OpenAI model name.  Defaults to "gpt-3.5-turbo".
-
-    Returns
-    -------
-    dict
-        The parsed evaluation with keys "completeness", "conciseness",
-        "correctness", and "comment".
-
-    Raises
-    ------
-    RuntimeError
-        If the OpenAI module is not installed or the API key is missing.
+    Variations permute field order and lightly rephrase instructions.
     """
+    variant = idx % 4
+    if variant == 0:
+        return build_prompt(question, expected, participant)
+    if variant == 1:
+        return (
+            "Evaluate the answer strictly per the rubric below and return only JSON.\n\n"
+            + f"Participant answer: {participant}\n"
+            + f"Expected answer: {expected}\n"
+            + f"Question: {question}\n\n"
+            + "Keys: completeness, conciseness, correctness, comment."
+        )
+    if variant == 2:
+        return (
+            "You are a careful grader. Score on a 0-5 scale for each criterion and justify briefly.\n\n"
+            + f"Question: {question}\n"
+            + f"Participant answer: {participant}\n"
+            + f"Expected answer: {expected}\n\n"
+            + "Return JSON with completeness, conciseness, correctness, comment."
+        )
+    # variant 3
+    return (
+        "Return JSON only. Consider correctness most important, then completeness, then conciseness.\n\n"
+        + f"Expected answer: {expected}\n"
+        + f"Question: {question}\n"
+        + f"Participant answer: {participant}\n\n"
+        + "Fields: completeness, conciseness, correctness, comment."
+    )
+
+
+def llm_evaluate(question: str, expected: str, answer: str, model: str = "gpt-3.5-turbo") -> Dict[str, Any]:
+    """Call an OpenAI LLM to score a single answer."""
     if openai is None:
         raise RuntimeError("openai module is not installed; install openai or use heuristic mode")
-    # Build prompt
     prompt = build_prompt(question, expected, answer)
-    # Call the API
     try:
         response = openai.ChatCompletion.create(
             model=model,
@@ -228,9 +234,50 @@ def llm_evaluate(question: str, expected: str, answer: str, model: str = "gpt-3.
         )
     except Exception as e:
         raise RuntimeError(f"OpenAI API request failed: {e}")
-    # Extract the assistant's message
     content = response["choices"][0]["message"]["content"]
     return parse_response(content)
+
+
+def llm_evaluate_self_consistent(
+    question: str,
+    expected: str,
+    answer: str,
+    model: str,
+    runs: int,
+) -> Dict[str, Any]:
+    """Run multiple LLM evaluations with prompt variants and aggregate by median."""
+    if openai is None:
+        raise RuntimeError("openai module is not installed; install openai or use heuristic mode")
+    runs = max(1, min(runs, 9))
+    results: List[Dict[str, Any]] = []
+    for i in range(runs):
+        prompt = _build_prompt_variant(i, question, expected, answer)
+        try:
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+            )
+            content = response["choices"][0]["message"]["content"]
+            parsed = parse_response(content)
+            results.append(parsed)
+        except Exception as e:
+            # Skip failed run; continue with others
+            continue
+    if not results:
+        raise RuntimeError("All self-consistency runs failed")
+    comp = [float(r.get("completeness", 0)) for r in results]
+    conc = [float(r.get("conciseness", 0)) for r in results]
+    corr = [float(r.get("correctness", 0)) for r in results]
+    # Median aggregation to reduce outliers
+    agg = {
+        "completeness": round(float(median(comp)), 2),
+        "conciseness": round(float(median(conc)), 2),
+        "correctness": round(float(median(corr)), 2),
+        # Take the shortest comment to keep it brief
+        "comment": sorted((r.get("comment", "") for r in results), key=lambda x: len(str(x)))[0] or "",
+    }
+    return agg
 
 
 def weighted_score(evaluation: Dict[str, float], weights: Tuple[float, float, float]) -> float:
@@ -253,30 +300,9 @@ def evaluate_submission(
     model: str = "gpt-3.5-turbo",
     workers: int = 1,
     weights: Optional[Tuple[float, float, float]] = None,
+    sc_runs: int = 1,
 ) -> Dict[str, Any]:
-    """Evaluate all answers from a single participant submission.
-
-    Parameters
-    ----------
-    questions : dict
-        Mapping from question IDs to question text and expected answer.
-    submission : dict
-        Participant submission loaded from JSON.
-    use_llm : bool, optional
-        Whether to use an LLM instead of heuristic scoring.  Defaults to False.
-    model : str, optional
-        The OpenAI model to use when calling the LLM.  Defaults to "gpt-3.5-turbo".
-    workers : int, optional
-        Number of parallel workers.  1 means sequential. Defaults to 1.
-    weights : (float, float, float), optional
-        Weights for (completeness, conciseness, correctness). Defaults to env/defaults.
-
-    Returns
-    -------
-    dict
-        A results dictionary including the participant_id and a list of
-        evaluations per question.
-    """
+    """Evaluate all answers from a single participant submission."""
     participant_id = submission.get("participant_id") or "unknown"
     answers_list = list(submission.get("answers", []))
     effective_weights = weights if weights is not None else load_weights_from_env()
@@ -290,7 +316,10 @@ def evaluate_submission(
         q_text = q_info["question"]
         expected = q_info["expected_answer"]
         if use_llm:
-            evaluation = llm_evaluate(q_text, expected, ans_text, model=model)
+            if sc_runs and sc_runs > 1:
+                evaluation = llm_evaluate_self_consistent(q_text, expected, ans_text, model=model, runs=sc_runs)
+            else:
+                evaluation = llm_evaluate(q_text, expected, ans_text, model=model)
         else:
             evaluation = heuristic_evaluate(expected, ans_text)
         evaluation["score"] = weighted_score(evaluation, effective_weights)
@@ -300,12 +329,9 @@ def evaluate_submission(
 
     if workers and workers > 1:
         from concurrent.futures import ThreadPoolExecutor
-
-        # Cap workers to a reasonable number to avoid API rate limits
         max_workers = max(1, min(workers, 10))
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = [pool.submit(process_one, item) for item in answers_list]
-            # Preserve original order
             results_questions = [f.result() for f in futures]
     else:
         for item in answers_list:
@@ -322,13 +348,6 @@ def write_results(results: Dict[str, Any], out_dir: str) -> None:
     """Write a participant's evaluation results to a JSON file.
 
     The filename is based on the participant_id.
-
-    Parameters
-    ----------
-    results : dict
-        The evaluation results for a single participant.
-    out_dir : str
-        Directory in which to write the JSON file.
     """
     pid = results.get("participant_id") or "unknown"
     out_path = os.path.join(out_dir, f"{pid}.json")
@@ -337,15 +356,7 @@ def write_results(results: Dict[str, Any], out_dir: str) -> None:
 
 
 def append_summary(summary_rows: List[Dict[str, Any]], out_dir: str) -> None:
-    """Write the summary CSV file for all participants.
-
-    Parameters
-    ----------
-    summary_rows : list of dict
-        Each dict contains participant_id, question_id, and scores.
-    out_dir : str
-        Directory in which to write the summary CSV.
-    """
+    """Write the summary CSV file for all participants."""
     csv_path = os.path.join(out_dir, "summary.csv")
     fieldnames = ["participant_id", "question_id", "completeness", "conciseness", "correctness", "score"]
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
@@ -366,6 +377,7 @@ def main() -> None:
     parser.add_argument("--weight-completeness", type=float, default=None, help="Weight for completeness")
     parser.add_argument("--weight-conciseness", type=float, default=None, help="Weight for conciseness")
     parser.add_argument("--weight-correctness", type=float, default=None, help="Weight for correctness")
+    parser.add_argument("--sc-runs", type=int, default=int(os.getenv("SELF_CONSISTENCY_RUNS", "1")), help="Self-consistency runs (repeat LLM and aggregate)")
     args = parser.parse_args()
 
     # Ensure output directory exists
@@ -411,6 +423,7 @@ def main() -> None:
                 model=args.model,
                 workers=args.workers,
                 weights=weights,
+                sc_runs=args.sc_runs,
             )
         except Exception as exc:
             print(f"Error evaluating {filename}: {exc}", file=sys.stderr)
