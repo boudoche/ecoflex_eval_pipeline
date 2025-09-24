@@ -42,9 +42,10 @@ python3 evaluate.py \
     --questions questions.json \
     --submissions_dir submissions \
     --out_dir results \
-    --use-llm \
-    --model gpt-3.5-turbo
+    --use-llm
 ```
+
+The evaluator uses GPT-4o-mini by default for LLM-based scoring.
 
 ### Parallelization (CLI)
 
@@ -121,10 +122,9 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 - Results are written to `results/` and `results/summary.csv` by default. Configure with env vars:
   - `QUESTIONS_PATH` (default: `questions.json`)
   - `RESULTS_DIR` (default: `./results`)
-  - `OPENAI_MODEL` (default: `gpt-3.5-turbo`)
 
 Server behavior:
-- Uses LLM by default (`use_llm=true`); set `OPENAI_API_KEY` on the server.
+- Uses LLM by default (`use_llm=true`) with GPT-4o-mini; set `OPENAI_API_KEY` on the server.
 - Uses a fixed concurrency for grading (default 6 workers). Set `FIXED_WORKERS` env to adjust server‑side.
 - Supports self‑consistency via env: `SELF_CONSISTENCY_RUNS` (e.g., 3).
 - Supports scoring weights via env: `WEIGHT_COMPLETENESS`, `WEIGHT_CONCISENESS`, `WEIGHT_CORRECTNESS`.
