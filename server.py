@@ -12,6 +12,8 @@ from evaluate import (
     write_results,
 )
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 QUESTIONS_PATH = os.getenv("QUESTIONS_PATH", os.path.join(os.path.dirname(__file__), "questions.json"))
 RESULTS_DIR = os.getenv("RESULTS_DIR", os.path.join(os.path.dirname(__file__), "results"))
@@ -23,7 +25,7 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.2.0")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.3.0")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -47,6 +49,7 @@ async def root_redirect() -> RedirectResponse:
 _state: Dict[str, Any] = {
     "questions": {},
     "token_to_team": {},
+    "executor": None,
 }
 
 
@@ -97,6 +100,16 @@ async def startup_event() -> None:
     except Exception as exc:
         raise RuntimeError(f"Failed to load questions from {QUESTIONS_PATH}: {exc}")
     _state["token_to_team"] = _load_tokens()
+    # ThreadPool for running CPU/IO bound grading off the event loop
+    max_threads = max(4, FIXED_WORKERS)
+    _state["executor"] = ThreadPoolExecutor(max_workers=max_threads)
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    executor = _state.get("executor")
+    if executor is not None:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 @app.get("/health")
@@ -120,6 +133,12 @@ async def reload_tokens() -> Dict[str, int]:
     return {"loaded": len(mapping)}
 
 
+async def _run_in_executor(func, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    executor = _state.get("executor")
+    return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))
+
+
 @app.post("/grade")
 async def grade_submission(
     submission: Dict[str, Any],
@@ -137,19 +156,22 @@ async def grade_submission(
     submission["participant_id"] = team
 
     try:
-        result = evaluate_submission(
+        result = await _run_in_executor(
+            evaluate_submission,
             questions,
             submission,
-            use_llm=use_llm,
-            model=DEFAULT_MODEL,
-            workers=FIXED_WORKERS,
+            use_llm,
+            DEFAULT_MODEL,
+            FIXED_WORKERS,
+            None,
+            int(os.getenv("SELF_CONSISTENCY_RUNS", "1")),
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
     if write_files:
         try:
-            write_results(result, RESULTS_DIR)
+            await _run_in_executor(write_results, result, RESULTS_DIR)
             from csv import DictWriter
             csv_path = os.path.join(RESULTS_DIR, "summary.csv")
             fieldnames = [
@@ -174,11 +196,15 @@ async def grade_submission(
                         "score": eval_data["score"],
                     }
                 )
-            with open(csv_path, "w", newline="", encoding="utf-8") as fh:
-                writer = DictWriter(fh, fieldnames=fieldnames)
-                writer.writeheader()
-                for r in rows:
-                    writer.writerow(r)
+            # Write CSV on executor
+            def _write_csv(path: str, fields: List[str], data_rows: List[Dict[str, Any]]):
+                from csv import DictWriter as _DW
+                with open(path, "w", newline="", encoding="utf-8") as fh:
+                    writer = _DW(fh, fieldnames=fields)
+                    writer.writeheader()
+                    for r in data_rows:
+                        writer.writerow(r)
+            await _run_in_executor(_write_csv, csv_path, fieldnames, rows)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Failed to write results: {exc}")
 
@@ -199,7 +225,6 @@ async def grade_batch(
         raise HTTPException(status_code=500, detail="Questions not loaded")
 
     results: List[Dict[str, Any]] = []
-    from csv import DictWriter
 
     if write_files:
         _ensure_results_dir()
@@ -218,12 +243,15 @@ async def grade_batch(
         sub = dict(submission)
         sub["participant_id"] = team
         try:
-            result = evaluate_submission(
+            result = await _run_in_executor(
+                evaluate_submission,
                 questions,
                 sub,
-                use_llm=use_llm,
-                model=DEFAULT_MODEL,
-                workers=FIXED_WORKERS,
+                use_llm,
+                DEFAULT_MODEL,
+                FIXED_WORKERS,
+                None,
+                int(os.getenv("SELF_CONSISTENCY_RUNS", "1")),
             )
             results.append(result)
         except Exception as exc:
@@ -232,7 +260,7 @@ async def grade_batch(
 
         if write_files:
             try:
-                write_results(result, RESULTS_DIR)
+                await _run_in_executor(write_results, result, RESULTS_DIR)
                 pid = result.get("participant_id") or "unknown"
                 for q in result.get("questions", []):
                     eval_data = q["evaluation"]
@@ -251,11 +279,14 @@ async def grade_batch(
 
     if write_files:
         try:
-            with open(os.path.join(RESULTS_DIR, "summary.csv"), "w", newline="", encoding="utf-8") as fh:
-                writer = DictWriter(fh, fieldnames=fieldnames)
-                writer.writeheader()
-                for r in all_rows:
-                    writer.writerow(r)
+            def _write_csv(path: str, fields: List[str], data_rows: List[Dict[str, Any]]):
+                from csv import DictWriter as _DW
+                with open(path, "w", newline="", encoding="utf-8") as fh:
+                    writer = _DW(fh, fieldnames=fields)
+                    writer.writeheader()
+                    for r in data_rows:
+                        writer.writerow(r)
+            await _run_in_executor(_write_csv, csv_path, fieldnames, all_rows)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Failed to write summary: {exc}")
 

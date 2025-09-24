@@ -23,6 +23,9 @@ import csv
 import json
 import os
 import sys
+import time
+import random
+import threading
 from statistics import median
 from typing import Dict, Any, List, Tuple, Optional
 
@@ -37,6 +40,10 @@ except ImportError:
 
 DEFAULT_WEIGHTS: Tuple[float, float, float] = (0.3, 0.2, 0.5)
 MODEL_NAME = "gpt-4o-mini"
+
+# Global OpenAI concurrency limiter (per-process)
+_OPENAI_CONCURRENCY = max(1, int(os.getenv("OPENAI_CONCURRENCY", "6")))
+_OPENAI_SEMAPHORE = threading.Semaphore(_OPENAI_CONCURRENCY)
 
 
 def load_weights_from_env() -> Tuple[float, float, float]:
@@ -222,20 +229,41 @@ def _build_prompt_variant(idx: int, question: str, expected: str, participant: s
     )
 
 
-def llm_evaluate(question: str, expected: str, answer: str, model: str = MODEL_NAME) -> Dict[str, Any]:
-    """Call an OpenAI LLM to score a single answer."""
+def _call_openai_chat(prompt: str, model: str) -> str:
+    """Call OpenAI ChatCompletion with global concurrency limit and retry/backoff.
+
+    Returns the assistant content string.
+    """
     if openai is None:
         raise RuntimeError("openai module is not installed; install openai or use heuristic mode")
+
+    max_retries = 4
+    base_delay = 0.5
+
+    for attempt in range(max_retries + 1):
+        with _OPENAI_SEMAPHORE:
+            try:
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+                return response["choices"][0]["message"]["content"]
+            except Exception as e:
+                # Backoff on transient errors (rate limit, 5xx, network)
+                if attempt >= max_retries:
+                    raise RuntimeError(f"OpenAI API request failed after retries: {e}")
+        # jittered exponential backoff outside the semaphore to free a slot
+        sleep_seconds = base_delay * (2 ** attempt) * (1.0 + random.random() * 0.25)
+        time.sleep(sleep_seconds)
+
+    raise RuntimeError("Unreachable: exhausted retries without raising")
+
+
+def llm_evaluate(question: str, expected: str, answer: str, model: str = MODEL_NAME) -> Dict[str, Any]:
+    """Call an OpenAI LLM to score a single answer."""
     prompt = build_prompt(question, expected, answer)
-    try:
-        response = openai.ChatCompletion.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-        )
-    except Exception as e:
-        raise RuntimeError(f"OpenAI API request failed: {e}")
-    content = response["choices"][0]["message"]["content"]
+    content = _call_openai_chat(prompt, model)
     return parse_response(content)
 
 
@@ -247,22 +275,15 @@ def llm_evaluate_self_consistent(
     runs: int,
 ) -> Dict[str, Any]:
     """Run multiple LLM evaluations with prompt variants and aggregate by median."""
-    if openai is None:
-        raise RuntimeError("openai module is not installed; install openai or use heuristic mode")
     runs = max(1, min(runs, 9))
     results: List[Dict[str, Any]] = []
     for i in range(runs):
         prompt = _build_prompt_variant(i, question, expected, answer)
         try:
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-            )
-            content = response["choices"][0]["message"]["content"]
+            content = _call_openai_chat(prompt, model)
             parsed = parse_response(content)
             results.append(parsed)
-        except Exception as e:
+        except Exception:
             continue
     if not results:
         raise RuntimeError("All self-consistency runs failed")

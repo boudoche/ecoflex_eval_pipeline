@@ -97,6 +97,17 @@ python3 evaluate.py ... --use-llm --sc-runs 3
 
 You can also set `SELF_CONSISTENCY_RUNS` in the environment.
 
+### OpenAI concurrency and retries (CLI)
+
+- Global per‑process limit on concurrent OpenAI calls: `OPENAI_CONCURRENCY` (default `6`).
+- Automatic retry with exponential backoff and jitter on transient errors (rate limits, 5xx, network).
+
+Example:
+
+```bash
+export OPENAI_CONCURRENCY=6
+```
+
 ## API Server (Auto‑Grading)
 
 A lightweight FastAPI server is provided in `server.py` to accept HTTP submissions and grade them automatically.
@@ -126,6 +137,7 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 Server behavior:
 - Uses LLM by default (`use_llm=true`) with GPT-4o-mini; set `OPENAI_API_KEY` on the server.
 - Uses a fixed concurrency for grading (default 6 workers). Set `FIXED_WORKERS` env to adjust server‑side.
+- Runs grading on a background threadpool so the event loop stays responsive.
 - Supports self‑consistency via env: `SELF_CONSISTENCY_RUNS` (e.g., 3).
 - Supports scoring weights via env: `WEIGHT_COMPLETENESS`, `WEIGHT_CONCISENESS`, `WEIGHT_CORRECTNESS`.
 - Requires a submission token header; maps token → team.
@@ -189,6 +201,7 @@ A lightweight token‑based heuristic computes all three scores without calling 
 - The prompt includes a clear rubric and 0/3/5 **calibration anchors** to stabilize the scale.
 - Optional **self‑consistency** aggregates multiple LLM runs by median.
 - Temperature is 0.0 to minimize randomness.
+- Global OpenAI concurrency limit per process with retries/backoff on transient errors.
 
 ### Parallelization
 
