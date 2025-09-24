@@ -25,7 +25,7 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
 
-app = FastAPI(title="Ecoflex Auto Grader", version="1.3.2")
+app = FastAPI(title="Ecoflex Auto Grader", version="1.3.3")
 
 # Allow CORS for simple integration/testing; tighten in production
 app.add_middleware(
@@ -188,7 +188,7 @@ async def grade_submission(
             DEFAULT_MODEL,
             FIXED_WORKERS,
             None,
-            int(os.getenv("SELF_CONSISTENCY_RUNS", "1")),
+            int(os.getenv("SELF_CONSISTENCY_RUNS", "3")),
         )
     except HTTPException:
         raise
@@ -289,7 +289,7 @@ async def grade_batch(
                 DEFAULT_MODEL,
                 FIXED_WORKERS,
                 None,
-                int(os.getenv("SELF_CONSISTENCY_RUNS", "1")),
+                int(os.getenv("SELF_CONSISTENCY_RUNS", "3")),
             )
             results.append(result)
         except Exception as exc:

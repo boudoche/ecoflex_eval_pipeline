@@ -45,6 +45,9 @@ MODEL_NAME = "gpt-4o-mini"
 _OPENAI_CONCURRENCY = max(1, int(os.getenv("OPENAI_CONCURRENCY", "6")))
 _OPENAI_SEMAPHORE = threading.Semaphore(_OPENAI_CONCURRENCY)
 
+# Default self-consistency runs (can be overridden by env and CLI)
+DEFAULT_SC_RUNS = int(os.getenv("SELF_CONSISTENCY_RUNS", "3"))
+
 
 def load_weights_from_env() -> Tuple[float, float, float]:
     """Load scoring weights from environment variables if set, else defaults.
@@ -406,7 +409,7 @@ def main() -> None:
     parser.add_argument("--weight-completeness", type=float, default=None, help="Weight for completeness")
     parser.add_argument("--weight-conciseness", type=float, default=None, help="Weight for conciseness")
     parser.add_argument("--weight-correctness", type=float, default=None, help="Weight for correctness")
-    parser.add_argument("--sc-runs", type=int, default=int(os.getenv("SELF_CONSISTENCY_RUNS", "1")), help="Self-consistency runs (repeat LLM and aggregate)")
+    parser.add_argument("--sc-runs", type=int, default=DEFAULT_SC_RUNS, help="Self-consistency runs (repeat LLM and aggregate)")
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)

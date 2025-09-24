@@ -89,10 +89,12 @@ To reduce variance from a single LLM call, you can enable self‑consistency:
 - The evaluator runs multiple LLM calls with small prompt variants
 - It aggregates the median for each score (completeness/conciseness/correctness)
 
-Enable with:
+Default: 3 runs. Override with CLI or env.
+
+Enable/override with:
 
 ```bash
-python3 evaluate.py ... --use-llm --sc-runs 3
+python3 evaluate.py ... --use-llm --sc-runs 5
 ```
 
 You can also set `SELF_CONSISTENCY_RUNS` in the environment.
@@ -138,7 +140,7 @@ Server behavior:
 - Uses LLM by default (`use_llm=true`) with GPT-4o-mini; set `OPENAI_API_KEY` on the server.
 - Uses a fixed concurrency for grading (default 6 workers). Set `FIXED_WORKERS` env to adjust server‑side.
 - Runs grading on a background threadpool so the event loop stays responsive.
-- Supports self‑consistency via env: `SELF_CONSISTENCY_RUNS` (e.g., 3).
+- Self‑consistency default is 3 runs; override via env: `SELF_CONSISTENCY_RUNS` (e.g., 5).
 - Supports scoring weights via env: `WEIGHT_COMPLETENESS`, `WEIGHT_CONCISENESS`, `WEIGHT_CORRECTNESS`.
 - Requires a submission token header; maps token → team.
 
