@@ -169,6 +169,39 @@ def _coerce_submission_shape(obj: Any) -> Dict[str, Any]:
     return obj
 
 
+def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict[str, Any]]) -> None:
+    try:
+        from openpyxl import Workbook
+    except Exception:
+        return
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Results"
+    headers = ["question_id", "completeness", "conciseness", "correctness", "score"]
+    ws.append(headers)
+    for q in questions:
+        eval_data = q.get("evaluation", {})
+        ws.append([
+            q.get("question_id"),
+            eval_data.get("completeness"),
+            eval_data.get("conciseness"),
+            eval_data.get("correctness"),
+            eval_data.get("score"),
+        ])
+    for idx in range(len(headers)):
+        try:
+            col_letter = chr(65 + idx)
+            ws.column_dimensions[col_letter].width = 18
+        except Exception:
+            pass
+    os.makedirs(results_dir, exist_ok=True)
+    xlsx_path = os.path.join(results_dir, f"{participant_id}.xlsx")
+    try:
+        wb.save(xlsx_path)
+    except Exception:
+        pass
+
+
 @app.post("/grade")
 async def grade_submission(
     request: Request,
@@ -247,6 +280,8 @@ async def grade_submission(
                     for r in data_rows:
                         writer.writerow(r)
             await _run_in_executor(_write_csv, csv_path, fieldnames, rows)
+            # Also write XLSX per participant
+            await _run_in_executor(_write_team_xlsx, RESULTS_DIR, pid, result.get("questions", []))
         except Exception as exc:
             logger.exception("Failed to write results for participant %s", pid)
             raise HTTPException(status_code=500, detail=f"Failed to write results: {exc}")
@@ -334,6 +369,8 @@ async def grade_batch(
                             "score": eval_data["score"],
                         }
                     )
+                # Also write XLSX per participant
+                await _run_in_executor(_write_team_xlsx, RESULTS_DIR, pid, result.get("questions", []))
             except Exception as exc:
                 logger.exception("Failed to write results for participant %s (batch)", pid)
                 results.append({"participant_id": pid, "error": f"Failed to write results: {exc}"})
