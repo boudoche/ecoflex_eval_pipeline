@@ -170,9 +170,11 @@ def _coerce_submission_shape(obj: Any) -> Dict[str, Any]:
 
 
 def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict[str, Any]]) -> None:
+    logger.debug("Preparing XLSX for participant=%s in dir=%s", participant_id, results_dir)
     try:
         from openpyxl import Workbook
-    except Exception:
+    except Exception as exc:
+        logger.warning("openpyxl not available, skipping XLSX for %s: %s", participant_id, exc)
         return
     wb = Workbook()
     ws = wb.active
@@ -195,11 +197,12 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
         except Exception:
             pass
     os.makedirs(results_dir, exist_ok=True)
-    xlsx_path = os.path.join(results_dir, f"{participant_id}.xlsx")
+    xlsx_path = os.path.abspath(os.path.join(results_dir, f"{participant_id}.xlsx"))
     try:
         wb.save(xlsx_path)
-    except Exception:
-        pass
+        logger.info("Wrote XLSX: %s", xlsx_path)
+    except Exception as exc:
+        logger.exception("Failed to write XLSX %s: %s", xlsx_path, exc)
 
 
 @app.post("/grade")
