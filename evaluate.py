@@ -473,6 +473,41 @@ def append_summary(summary_rows: List[Dict[str, Any]], out_dir: str) -> None:
         for row in summary_rows:
             writer.writerow(row)
 
+    # Also write per-team Excel workbooks with one row per question
+    try:
+        from openpyxl import Workbook
+    except Exception:
+        return
+
+    # Group rows by participant
+    by_team: Dict[str, List[Dict[str, Any]]] = {}
+    for row in summary_rows:
+        pid = str(row.get("participant_id") or "unknown")
+        by_team.setdefault(pid, []).append(row)
+
+    for pid, rows in by_team.items():
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Results"
+        headers = ["question_id", "completeness", "conciseness", "correctness", "score"]
+        ws.append(headers)
+        for r in rows:
+            ws.append([
+                r.get("question_id"),
+                r.get("completeness"),
+                r.get("conciseness"),
+                r.get("correctness"),
+                r.get("score"),
+            ])
+        # Auto width (simple)
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[chr(64 + col)].width = 18
+        xlsx_path = os.path.join(out_dir, f"{pid}.xlsx")
+        try:
+            wb.save(xlsx_path)
+        except Exception:
+            continue
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate Ecoflex hackathon answers")
