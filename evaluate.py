@@ -59,6 +59,9 @@ _RESULTS_DIR_DEFAULT = os.getenv("RESULTS_DIR", os.path.join(os.path.dirname(__f
 LLM_LOG_FILE = os.getenv("LLM_LOG_FILE", os.path.join(_RESULTS_DIR_DEFAULT, "llm_responses.log"))
 _LLM_FILE_LOCK = threading.Lock()
 
+# Threshold to flag inconsistent scores across self-consistency variants
+_INCONSISTENCY_RANGE = float(os.getenv("INCONSISTENCY_RANGE", "1.5"))
+
 
 def load_weights_from_env() -> Tuple[float, float, float]:
     """Load scoring weights from environment variables if set, else defaults.
@@ -372,6 +375,15 @@ def llm_evaluate_self_consistent(
         "conciseness": m_conc,
         "correctness": m_corr,
         "comment": chosen_comment,
+        "inconsistent": (
+            (max(comp) - min(comp) > _INCONSISTENCY_RANGE)
+            or (max(conc) - min(conc) > _INCONSISTENCY_RANGE)
+            or (max(corr) - min(corr) > _INCONSISTENCY_RANGE)
+        ),
+        "variant_scores": [
+            {"completeness": float(r.get("completeness", 0)), "conciseness": float(r.get("conciseness", 0)), "correctness": float(r.get("correctness", 0))}
+            for r in results
+        ],
     }
     return agg
 
