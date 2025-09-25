@@ -179,17 +179,34 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
     wb = Workbook()
     ws = wb.active
     ws.title = "Results"
-    headers = ["question_id", "completeness", "conciseness", "correctness", "score"]
+    headers = [
+        "question_id",
+        "completeness",
+        "conciseness",
+        "correctness",
+        "score",
+        "inconsistent",
+        "variant_scores",
+        "variant_comments",
+    ]
     ws.append(headers)
+    from openpyxl.styles import PatternFill
+    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
     for q in questions:
         eval_data = q.get("evaluation", {})
-        ws.append([
+        row = [
             q.get("question_id"),
             eval_data.get("completeness"),
             eval_data.get("conciseness"),
             eval_data.get("correctness"),
             eval_data.get("score"),
-        ])
+            bool(eval_data.get("inconsistent", False)),
+            json.dumps(eval_data.get("variant_scores", []), ensure_ascii=False),
+            json.dumps(eval_data.get("variant_comments", []), ensure_ascii=False),
+        ]
+        ws.append(row)
+        if row[5]:
+            ws.cell(row=ws.max_row, column=1).fill = red_fill
     for idx in range(len(headers)):
         try:
             col_letter = chr(65 + idx)

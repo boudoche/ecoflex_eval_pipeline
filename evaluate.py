@@ -384,6 +384,9 @@ def llm_evaluate_self_consistent(
             {"completeness": float(r.get("completeness", 0)), "conciseness": float(r.get("conciseness", 0)), "correctness": float(r.get("correctness", 0))}
             for r in results
         ],
+        "variant_comments": [
+            str(r.get("comment", "")) for r in results
+        ],
     }
     return agg
 
