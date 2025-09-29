@@ -255,34 +255,46 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
     wb = Workbook()
     ws = wb.active
     ws.title = "Results"
-    headers = [
-        "question_id",
-        "completeness",
-        "conciseness",
-        "correctness",
-        "score",
-        "inconsistent",
-        "variant_scores",
-        "variant_comments",
-    ]
-    ws.append(headers)
+    # Layout: for each question, reserve 4 rows
+    # First columns per question on the first row: Qid, submitted answer, correct answers, final score, inconsistent
+    # Next 4 rows (one per variant): correctness, conciseness, completeness, score, comment
     from openpyxl.styles import PatternFill
     red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+
+    # Write a header block legend at the top
+    ws.append(["Qid", "submitted answer", "correct answers", "final score", "inconsistent",
+               "variant correctness", "variant conciseness", "variant completeness", "variant score", "variant comment"]) 
+    for col in range(1, 11):
+        try:
+            ws.column_dimensions[chr(64 + col)].width = 24 if col in (2,3,10) else 18
+        except Exception:
+            pass
+
     for q in questions:
+        qid = q.get("question_id")
+        submitted = q.get("submitted_answer", "")
         eval_data = q.get("evaluation", {})
-        row = [
-            q.get("question_id"),
-            eval_data.get("completeness"),
-            eval_data.get("conciseness"),
-            eval_data.get("correctness"),
-            eval_data.get("score"),
-            bool(eval_data.get("inconsistent", False)),
-            json.dumps(eval_data.get("variant_scores", []), ensure_ascii=False),
-            json.dumps(eval_data.get("variant_comments", []), ensure_ascii=False),
-        ]
-        ws.append(row)
-        if row[5]:
+        final_score = eval_data.get("score")
+        inconsistent = bool(eval_data.get("inconsistent", False))
+        # Write the question summary row
+        ws.append([qid, submitted, "(see expected answers in system)", final_score, inconsistent, None, None, None, None, None])
+        if inconsistent:
             ws.cell(row=ws.max_row, column=1).fill = red_fill
+
+        # Variants
+        v_scores = eval_data.get("variant_scores", []) or []
+        v_comments = eval_data.get("variant_comments", []) or []
+        v_weighted = eval_data.get("variant_weighted", []) or []
+        # Ensure 4 rows
+        max_rows = 4
+        for i in range(max_rows):
+            if i < len(v_scores):
+                v = v_scores[i]
+                comment = v_comments[i] if i < len(v_comments) else ""
+                w = v_weighted[i] if i < len(v_weighted) else None
+                ws.append([None, None, None, None, None, v.get("correctness"), v.get("conciseness"), v.get("completeness"), w, comment])
+            else:
+                ws.append([None]*10)
     for idx in range(len(headers)):
         try:
             col_letter = chr(65 + idx)

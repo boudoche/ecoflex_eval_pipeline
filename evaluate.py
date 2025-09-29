@@ -434,7 +434,20 @@ def evaluate_submission(
         else:
             evaluation = heuristic_evaluate(expected, ans_text)
         evaluation["score"] = weighted_score(evaluation, effective_weights)
-        return {"question_id": qid, "evaluation": evaluation}
+        # If variants present, compute per-variant weighted scores
+        if isinstance(evaluation.get("variant_scores"), list):
+            c_w, z_w, r_w = effective_weights
+            var_weighted = []
+            for v in evaluation.get("variant_scores", []):
+                try:
+                    comp = float(v.get("completeness", 0))
+                    conc = float(v.get("conciseness", 0))
+                    corr = float(v.get("correctness", 0))
+                    var_weighted.append(round(c_w * comp + z_w * conc + r_w * corr, 2))
+                except Exception:
+                    var_weighted.append(None)
+            evaluation["variant_weighted"] = var_weighted
+        return {"question_id": qid, "submitted_answer": ans_text, "evaluation": evaluation}
 
     results_questions: List[Dict[str, Any]] = []
 
