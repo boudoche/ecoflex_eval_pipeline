@@ -295,12 +295,7 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
                 ws.append([None, None, None, None, None, v.get("correctness"), v.get("conciseness"), v.get("completeness"), w, comment])
             else:
                 ws.append([None]*10)
-    for idx in range(len(headers)):
-        try:
-            col_letter = chr(65 + idx)
-            ws.column_dimensions[col_letter].width = 18
-        except Exception:
-            pass
+    # Column widths already set in header block above; no further header-based sizing here
     os.makedirs(results_dir, exist_ok=True)
     xlsx_path = os.path.abspath(os.path.join(results_dir, f"{participant_id}.xlsx"))
     try:
