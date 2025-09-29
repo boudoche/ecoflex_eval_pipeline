@@ -2,6 +2,9 @@ import os
 import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 from fastapi import FastAPI, HTTPException, Query, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +28,7 @@ DEFAULT_MODEL = "gpt-4o-mini"
 FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 # Token sources
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
-TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token1:TeamA,token2:TeamB
+TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token:Team[:email],token:Team[:email]
 
 # Logging configuration (includes filename and line number)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -59,7 +62,7 @@ async def root_redirect() -> RedirectResponse:
 # In-memory state
 _state: Dict[str, Any] = {
     "questions": {},
-    "token_to_team": {},
+    "token_to_info": {},  # token -> {team:str, email:str, used:bool}
     "executor": None,
 }
 
@@ -68,39 +71,111 @@ def _ensure_results_dir() -> None:
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
-def _load_tokens() -> Dict[str, str]:
-    mapping: Dict[str, str] = {}
+def _load_tokens() -> Dict[str, Dict[str, Any]]:
+    result: Dict[str, Dict[str, Any]] = {}
+    # From env: token:Team[:email]
     env_value = os.getenv("TEAM_TOKENS", TEAM_TOKENS)
     if env_value:
         parts = [p.strip() for p in env_value.split(",") if p.strip()]
         for part in parts:
-            if ":" in part:
-                token, team = part.split(":", 1)
-                token = token.strip()
-                team = team.strip()
+            fields = part.split(":")
+            if len(fields) >= 2:
+                token = fields[0].strip()
+                team = fields[1].strip()
+                email = fields[2].strip() if len(fields) >= 3 else ""
                 if token:
-                    mapping[token] = team
+                    result[token] = {"team": team, "email": email, "used": False}
+    # From file: either {token: team} or {token: {team, email, used}}
     path_value = os.getenv("TOKENS_PATH", TOKENS_PATH)
     if os.path.isfile(path_value):
         try:
-            import json
             with open(path_value, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            for token, team in data.items():
-                if isinstance(token, str) and isinstance(team, str):
-                    mapping[token] = team
+            if isinstance(data, dict):
+                for token, val in data.items():
+                    if not isinstance(token, str):
+                        continue
+                    if isinstance(val, str):
+                        result[token] = {"team": val, "email": result.get(token, {}).get("email", ""), "used": False}
+                    elif isinstance(val, dict):
+                        team = str(val.get("team", result.get(token, {}).get("team", "")))
+                        email = str(val.get("email", result.get(token, {}).get("email", "")))
+                        used = bool(val.get("used", False))
+                        if team:
+                            result[token] = {"team": team, "email": email, "used": used}
         except Exception:
             pass
-    return mapping
+    return result
 
 
-def _require_token_and_team(x_submission_token: Optional[str]) -> Tuple[str, str]:
+def _persist_tokens(mapping: Dict[str, Dict[str, Any]]) -> None:
+    path_value = os.getenv("TOKENS_PATH", TOKENS_PATH)
+    if not path_value:
+        return
+    # Only persist if a path is provided; write full mapping
+    try:
+        os.makedirs(os.path.dirname(path_value) or ".", exist_ok=True)
+        with open(path_value, "w", encoding="utf-8") as f:
+            json.dump(mapping, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+    except Exception:
+        logger.exception("Failed to persist tokens file at %s", path_value)
+
+
+def _require_token_and_team(x_submission_token: Optional[str]) -> Tuple[str, Dict[str, Any]]:
     if not x_submission_token:
         raise HTTPException(status_code=401, detail="Missing submission token")
-    team = _state["token_to_team"].get(x_submission_token)
-    if not team:
+    info = _state["token_to_info"].get(x_submission_token)
+    if not info or not info.get("team"):
         raise HTTPException(status_code=401, detail="Invalid submission token")
-    return x_submission_token, team
+    # Enforce one submission per token
+    if bool(info.get("used", False)):
+        raise HTTPException(status_code=409, detail="Submission already received for this token")
+    return x_submission_token, info
+
+
+def _send_confirmation_email(to_addr: str, participant_id: str, submission_json: Dict[str, Any]) -> None:
+    if not to_addr:
+        return
+    if os.getenv("EMAIL_ENABLED", "").lower() not in ("1", "true", "yes", "on"):
+        return
+    host = os.getenv("SMTP_HOST", "")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER", "")
+    password = os.getenv("SMTP_PASS", "")
+    from_addr = os.getenv("SMTP_FROM", user)
+    use_ssl = os.getenv("SMTP_USE_SSL", "").lower() in ("1", "true", "yes", "on")
+    if not host or not from_addr:
+        logger.warning("Email disabled: SMTP_HOST/SMTP_FROM not configured")
+        return
+    msg = EmailMessage()
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg["Subject"] = f"Ecoflex submission received - {participant_id}"
+    msg.set_content("Your submission was received successfully. Attached is a copy of your JSON file.")
+    payload = json.dumps(submission_json, indent=2, ensure_ascii=False).encode("utf-8")
+    msg.add_attachment(payload, maintype="application", subtype="json", filename=f"{participant_id}_submission.json")
+    try:
+        if use_ssl:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as s:
+                if user and password:
+                    s.login(user, password)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=30) as s:
+                s.ehlo()
+                try:
+                    s.starttls(context=ssl.create_default_context())
+                    s.ehlo()
+                except Exception:
+                    pass
+                if user and password:
+                    s.login(user, password)
+                s.send_message(msg)
+        logger.info("Sent confirmation email to %s", to_addr)
+    except Exception as exc:
+        logger.exception("Failed to send confirmation email to %s: %s", to_addr, exc)
 
 
 @app.on_event("startup")
@@ -111,7 +186,7 @@ async def startup_event() -> None:
     except Exception as exc:
         logger.exception("Failed to load questions from %s", QUESTIONS_PATH)
         raise RuntimeError(f"Failed to load questions from {QUESTIONS_PATH}: {exc}")
-    _state["token_to_team"] = _load_tokens()
+    _state["token_to_info"] = _load_tokens()
     # ThreadPool for running CPU/IO bound grading off the event loop
     max_threads = max(4, FIXED_WORKERS)
     _state["executor"] = ThreadPoolExecutor(max_workers=max_threads)
@@ -230,7 +305,8 @@ async def grade_submission(
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
-    _, team = _require_token_and_team(x_submission_token)
+    token, info = _require_token_and_team(x_submission_token)
+    team = info.get("team", "unknown")
 
     questions = _state.get("questions") or {}
     if not questions:
@@ -301,6 +377,15 @@ async def grade_submission(
                     for r in data_rows:
                         writer.writerow(r)
             await _run_in_executor(_write_csv, csv_path, fieldnames, rows)
+            # Mark token as used and persist
+            info["used"] = True
+            _state["token_to_info"][token] = info
+            _persist_tokens(_state["token_to_info"])
+            # Send confirmation email (best-effort)
+            try:
+                _send_confirmation_email(info.get("email", ""), team, sub)
+            except Exception:
+                logger.exception("Email confirmation failed for team %s", team)
             # Also write XLSX per participant
             await _run_in_executor(_write_team_xlsx, RESULTS_DIR, pid, result.get("questions", []))
         except Exception as exc:
@@ -317,7 +402,8 @@ async def grade_batch(
     write_files: bool = Query(True),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
-    _, team = _require_token_and_team(x_submission_token)
+    token, info = _require_token_and_team(x_submission_token)
+    team = info.get("team", "unknown")
 
     questions = _state.get("questions") or {}
     if not questions:
@@ -406,6 +492,14 @@ async def grade_batch(
                     for r in data_rows:
                         writer.writerow(r)
             await _run_in_executor(_write_csv, csv_path, fieldnames, all_rows)
+            # After batch, mark token used and persist; send single confirmation
+            info["used"] = True
+            _state["token_to_info"][token] = info
+            _persist_tokens(_state["token_to_info"])
+            try:
+                _send_confirmation_email(info.get("email", ""), team, {"submissions": items})
+            except Exception:
+                logger.exception("Email confirmation failed for team %s (batch)", team)
         except Exception as exc:
             logger.exception("Failed to write summary CSV")
             raise HTTPException(status_code=500, detail=f"Failed to write summary: {exc}")

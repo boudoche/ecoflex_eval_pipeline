@@ -2,3 +2,6 @@
 data-challenge-2025_answers_peter.json
 data-challenge-2025_answers_peter.converted.json
 reformat_submission.py
+greenhorizon_qna_part1.json
+.gitignore
+greenhorizon_qna_part2.json
