@@ -276,8 +276,18 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
         eval_data = q.get("evaluation", {})
         final_score = eval_data.get("score")
         inconsistent = bool(eval_data.get("inconsistent", False))
+        # Build main prompt info: include the question text and expected answer
+        expected_text = ""
+        try:
+            qinfo = _state.get("questions", {}).get(qid, {})
+            qtext = qinfo.get("question", "")
+            exp = qinfo.get("expected_answer", "")
+            if qtext or exp:
+                expected_text = f"Question: {qtext}\nExpected: {exp}"
+        except Exception:
+            expected_text = ""
         # Write the question summary row
-        ws.append([qid, submitted, "(see expected answers in system)", final_score, inconsistent, None, None, None, None, None])
+        ws.append([qid, submitted, expected_text, final_score, inconsistent, None, None, None, None, None])
         if inconsistent:
             ws.cell(row=ws.max_row, column=1).fill = red_fill
 
