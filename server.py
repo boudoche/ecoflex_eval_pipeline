@@ -16,6 +16,7 @@ from evaluate import (
     evaluate_submission,
     write_results,
 )
+from reporting import write_summary_csv
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -217,7 +218,7 @@ async def reload_questions() -> Dict[str, str]:
 @app.post("/reload-tokens")
 async def reload_tokens() -> Dict[str, int]:
     mapping = _load_tokens()
-    _state["token_to_team"] = mapping
+    _state["token_to_info"] = mapping
     return {"loaded": len(mapping)}
 
 
@@ -361,16 +362,7 @@ async def grade_submission(
     if write_files:
         try:
             await _run_in_executor(write_results, result, RESULTS_DIR)
-            from csv import DictWriter
             csv_path = os.path.join(RESULTS_DIR, "summary.csv")
-            fieldnames = [
-                "participant_id",
-                "question_id",
-                "completeness",
-                "conciseness",
-                "correctness",
-                "score",
-            ]
             rows: List[Dict[str, Any]] = []
             pid = result.get("participant_id") or "unknown"
             for q in result.get("questions", []):
@@ -385,15 +377,8 @@ async def grade_submission(
                         "score": eval_data["score"],
                     }
                 )
-            # Write CSV on executor
-            def _write_csv(path: str, fields: List[str], data_rows: List[Dict[str, Any]]):
-                from csv import DictWriter as _DW
-                with open(path, "w", newline="", encoding="utf-8") as fh:
-                    writer = _DW(fh, fieldnames=fields)
-                    writer.writeheader()
-                    for r in data_rows:
-                        writer.writerow(r)
-            await _run_in_executor(_write_csv, csv_path, fieldnames, rows)
+            # Write CSV using shared helper on executor
+            await _run_in_executor(write_summary_csv, csv_path, rows)
             # Mark token as used and persist
             info["used"] = True
             _state["token_to_info"][token] = info
@@ -438,14 +423,6 @@ async def grade_batch(
     if write_files:
         _ensure_results_dir()
         csv_path = os.path.join(RESULTS_DIR, "summary.csv")
-        fieldnames = [
-            "participant_id",
-            "question_id",
-            "completeness",
-            "conciseness",
-            "correctness",
-            "score",
-        ]
         all_rows: List[Dict[str, Any]] = []
 
     for item in items:
@@ -501,14 +478,7 @@ async def grade_batch(
 
     if write_files:
         try:
-            def _write_csv(path: str, fields: List[str], data_rows: List[Dict[str, Any]]):
-                from csv import DictWriter as _DW
-                with open(path, "w", newline="", encoding="utf-8") as fh:
-                    writer = _DW(fh, fieldnames=fields)
-                    writer.writeheader()
-                    for r in data_rows:
-                        writer.writerow(r)
-            await _run_in_executor(_write_csv, csv_path, fieldnames, all_rows)
+            await _run_in_executor(write_summary_csv, csv_path, all_rows)
             # After batch, mark token used and persist; send single confirmation
             info["used"] = True
             _state["token_to_info"][token] = info
