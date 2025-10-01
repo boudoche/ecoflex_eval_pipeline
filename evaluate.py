@@ -261,14 +261,58 @@ def _call_openai_chat(prompt: str, model: str) -> str:
     raise RuntimeError("Unreachable: exhausted retries without raising")
 
 
+def sanitize_participant_answer(text: str) -> str:
+    """Remove code fences and suspicious patterns that could confuse the LLM.
+    
+    This prevents prompt injection attacks via markdown code blocks or
+    instruction-like patterns in participant answers.
+    """
+    import re
+    # Remove markdown code fences (with or without language tags)
+    text = re.sub(r'```[a-z]*\n.*?\n```', '[code block removed]', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'```.*?```', '[code block removed]', text, flags=re.DOTALL)
+    # Remove triple backticks even without closing
+    text = re.sub(r'```[^\n]*', '', text)
+    return text.strip()
+
+
+def detect_suspicious_scores(evaluation: Dict[str, Any], answer: str) -> bool:
+    """Flag suspiciously high scores for short or nonsensical answers.
+    
+    Returns True if the evaluation looks suspicious and needs manual review.
+    """
+    comp = float(evaluation.get("completeness", 0))
+    conc = float(evaluation.get("conciseness", 0))
+    corr = float(evaluation.get("correctness", 0))
+    
+    # Flag if all scores are very high but answer is very short
+    if comp >= 4.5 and conc >= 4.5 and corr >= 4.5:
+        if len(answer.strip()) < 30:
+            return True
+    
+    # Flag if all scores are perfect 5s (rare legitimately)
+    if comp == 5.0 and conc == 5.0 and corr == 5.0:
+        return True
+    
+    return False
+
+
 def llm_evaluate(question: str, expected: str, answer: str, model: str = MODEL_NAME) -> Dict[str, Any]:
     """Call an OpenAI LLM to score a single answer.
     
     Uses variant 0 for consistency with self-consistency mode.
     """
-    prompt = build_prompt_variant(0, question, expected, answer)
+    sanitized_answer = sanitize_participant_answer(answer)
+    prompt = build_prompt_variant(0, question, expected, sanitized_answer)
     content = _call_openai_chat(prompt, model)
-    return parse_response(content)
+    evaluation = parse_response(content)
+    
+    # Flag suspicious scores for manual review
+    if detect_suspicious_scores(evaluation, answer):
+        evaluation["needs_manual_review"] = True
+        _LLM_LOGGER.warning("Suspicious scores detected for answer: %s", answer[:100])
+    
+    return evaluation
 
 
 def llm_evaluate_self_consistent(
@@ -287,9 +331,12 @@ def llm_evaluate_self_consistent(
 
     runs = max(1, min(runs, 9))
     results: List[Dict[str, Any]] = []
+    
+    # Sanitize once before all variants
+    sanitized_answer = sanitize_participant_answer(answer)
 
     if runs == 1:
-        prompt = build_prompt_variant(0, question, expected, answer)
+        prompt = build_prompt_variant(0, question, expected, sanitized_answer)
         content = _call_openai_chat(prompt, model)
         parsed = parse_response(content)
         results.append(parsed)
@@ -297,7 +344,7 @@ def llm_evaluate_self_consistent(
         max_workers = min(runs, _OPENAI_CONCURRENCY)
         def _task(i: int) -> Optional[Dict[str, Any]]:
             try:
-                p = build_prompt_variant(i, question, expected, answer)
+                p = build_prompt_variant(i, question, expected, sanitized_answer)
                 c = _call_openai_chat(p, model)
                 return parse_response(c)
             except Exception:
@@ -342,6 +389,12 @@ def llm_evaluate_self_consistent(
             str(r.get("comment", "")) for r in results
         ],
     }
+    
+    # Flag suspicious scores for manual review
+    if detect_suspicious_scores(agg, answer):
+        agg["needs_manual_review"] = True
+        _LLM_LOGGER.warning("Suspicious scores detected (self-consistency) for answer: %s", answer[:100])
+    
     return agg
 
 
