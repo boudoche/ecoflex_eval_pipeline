@@ -13,9 +13,8 @@ from typing import Any, Dict
 # should output a JSON object with the keys "completeness", "conciseness",
 # "correctness", and "comment".
 RUBRIC = """
-You are an impartial evaluator grading hackathon answers.  Each response is
-evaluated according to three independent criteria, scored on a scale from 0
-to 5, where 0 is worst and 5 is best:
+Evaluate each response according to three independent criteria, scored on a 
+scale from 0 to 5, where 0 is worst and 5 is best:
 
 • Completeness: Does the participant's answer include all important points
   present in the expected answer?  Penalise missing information.
@@ -49,43 +48,7 @@ Scoring anchors (examples for calibration, integer levels 0–5):
   • 3: Mostly correct with one or two minor inaccuracies.
   • 4: Correct with only negligible inaccuracies or omissions.
   • 5: Factually accurate and fully aligned with the expected answer.
-
-You MUST return your evaluation as a JSON object with exactly the keys
-"completeness", "conciseness", "correctness", and "comment".  The values of
-"completeness", "conciseness", and "correctness" must be numbers between 0
-and 5 (inclusive).  The "comment" field should contain a brief one- or two-
-sentence justification for the scores.
 """
-
-def build_prompt(question: str, expected_answer: str, participant_answer: str) -> str:
-    """Construct a prompt to send to an LLM for evaluating a single answer.
-
-    Parameters
-    ----------
-    question : str
-        The question being asked.
-    expected_answer : str
-        The canonical or reference answer that contains all required
-        information.
-    participant_answer : str
-        The answer provided by the participant.
-
-    Returns
-    -------
-    str
-        A formatted prompt combining the rubric and the specific question
-        context.  The prompt instructs the LLM to provide a JSON-formatted
-        evaluation.
-    """
-    return (
-        f"{RUBRIC}\n\n"
-        f"Question: {question}\n"
-        f"Expected answer: {expected_answer}\n"
-        f"Participant answer: {participant_answer}\n\n"
-        "Return your evaluation strictly as a JSON object with keys "
-        "\"completeness\", \"conciseness\", \"correctness\", and \"comment\"."
-    )
-
 
 def parse_response(response: str) -> Dict[str, Any]:
     """Parse a JSON object from an LLM's raw text response.
@@ -145,46 +108,46 @@ def parse_response(response: str) -> Dict[str, Any]:
 def build_prompt_variant(idx: int, question: str, expected: str, participant: str) -> str:
     """Return a slightly varied prompt to promote self-consistency.
 
-    Variations permute field order and lightly rephrase instructions. All variants
-    strictly require numeric 0–5 scores and a flat JSON schema with the exact keys
-    completeness, conciseness, correctness, and comment.
+    All variants include the full rubric with scoring anchors, treat criteria neutrally,
+    use a consistent field order (Question → Expected → Participant), and enforce strict
+    flat JSON output. Only the intro phrasing is lightly varied to reduce prompt overfitting.
     """
+    # Shared JSON output instruction (adds format enforcement to the rubric)
+    json_format = (
+        "\nFormat: Return ONLY a flat JSON object with exactly these keys:\n"
+        '{"completeness": <number 0-5>, "conciseness": <number 0-5>, "correctness": <number 0-5>, "comment": "<brief text>"}\n'
+        "Do NOT include code fences, nested objects, extra keys, or any text outside the JSON."
+    )
+
+    # Consistent field order for all variants
+    fields_block = (
+        f"\nQuestion: {question}\n"
+        f"Expected answer: {expected}\n"
+        f"Participant answer: {participant}"
+    )
+
     variant = idx % 4
     if variant == 0:
-        return (
-            build_prompt(question, expected, participant)
-        )
+        # Baseline: full rubric, neutral tone
+        return "You are an impartial evaluator grading hackathon answers.\n"
+            + f"{RUBRIC}{fields_block}{json_format}"
+    
     if variant == 1:
+        # Slightly rephrased intro, same rubric
         return (
-            "Evaluate the answer strictly per the rubric below and return only JSON.\n\n"
-            + f"Participant answer: {participant}\n"
-            + f"Expected answer: {expected}\n"
-            + f"Question: {question}\n\n"
-            + "Keys: completeness, conciseness, correctness, comment. Scores must be numeric 0-5."
-            + "\nReturn exactly this JSON shape (no extra keys):"
-            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-            + "\nNo nested objects, no arrays, no code fences, no prose outside the JSON."
+            "You are an impartial evaluator. Apply the rubric below strictly.\n"
+            + f"{RUBRIC}{fields_block}{json_format}"
         )
+    
     if variant == 2:
+        # Emphasize calibration anchors, same rubric
         return (
-            "You are a careful grader. Score on a 0-5 numeric scale for each criterion and justify briefly.\n\n"
-            + f"Question: {question}\n"
-            + f"Participant answer: {participant}\n"
-            + f"Expected answer: {expected}\n\n"
-            + "Return JSON with completeness, conciseness, correctness, comment. Scores must be numbers in [0,5]."
-            + "\nFormat (exact keys, no extras):"
-            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-            + "\nDo not return nested objects like {\"score\":..., \"justification\":...}."
-            + "\nDo not include code fences or any text outside the JSON."
+            "You are a careful grader. Use the scoring anchors in the rubric to assign precise scores.\n"
+            + f"{RUBRIC}{fields_block}{json_format}"
         )
-    # variant 3
+    
+    # variant 3: neutral phrasing, same rubric
     return (
-        "Return JSON only. Consider correctness most important, then completeness, then conciseness.\n\n"
-        + f"Expected answer: {expected}\n"
-        + f"Question: {question}\n"
-        + f"Participant answer: {participant}\n\n"
-        + "Fields: completeness, conciseness, correctness, comment. Each score must be numeric 0-5."
-        + "\nExact output JSON (no extra keys, no nesting):"
-        + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-        + "\nNo code fences, no prose before/after."
+        "You are evaluating a hackathon answer. Follow the rubric to score each criterion independently.\n"
+        + f"{RUBRIC}{fields_block}{json_format}"
     )

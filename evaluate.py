@@ -30,7 +30,7 @@ from statistics import median
 from typing import Dict, Any, List, Tuple, Optional
 import logging
 
-from prompts import build_prompt, parse_response, build_prompt_variant
+from prompts import parse_response, build_prompt_variant
 
 # Only import openai if needed; otherwise it's optional for heuristic mode.
 try:
@@ -262,8 +262,11 @@ def _call_openai_chat(prompt: str, model: str) -> str:
 
 
 def llm_evaluate(question: str, expected: str, answer: str, model: str = MODEL_NAME) -> Dict[str, Any]:
-    """Call an OpenAI LLM to score a single answer."""
-    prompt = build_prompt(question, expected, answer)
+    """Call an OpenAI LLM to score a single answer.
+    
+    Uses variant 0 for consistency with self-consistency mode.
+    """
+    prompt = build_prompt_variant(0, question, expected, answer)
     content = _call_openai_chat(prompt, model)
     return parse_response(content)
 
