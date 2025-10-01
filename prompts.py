@@ -129,8 +129,10 @@ def build_prompt_variant(idx: int, question: str, expected: str, participant: st
     variant = idx % 4
     if variant == 0:
         # Baseline: full rubric, neutral tone
-        return "You are an impartial evaluator grading hackathon answers.\n"
+        return (
+            "You are an impartial evaluator grading hackathon answers.\n"
             + f"{RUBRIC}{fields_block}{json_format}"
+        )
     
     if variant == 1:
         # Slightly rephrased intro, same rubric
