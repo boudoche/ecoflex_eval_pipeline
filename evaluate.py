@@ -30,7 +30,7 @@ from statistics import median
 from typing import Dict, Any, List, Tuple, Optional
 import logging
 
-from prompts import build_prompt, parse_response
+from prompts import build_prompt, parse_response, build_prompt_variant
 
 # Only import openai if needed; otherwise it's optional for heuristic mode.
 try:
@@ -212,55 +212,6 @@ def heuristic_evaluate(expected: str, answer: str) -> Dict[str, Any]:
     }
 
 
-def _build_prompt_variant(idx: int, question: str, expected: str, participant: str) -> str:
-    """Return a slightly varied prompt to promote self-consistency.
-
-    Variations permute field order and lightly rephrase instructions.
-    """
-    variant = idx % 4
-    if variant == 0:
-        return (
-            build_prompt(question, expected, participant)
-            + "\n\nScores must be numeric on a 0-5 scale for each criterion."
-            + "\nOutput exactly one JSON object with this exact shape (no extra keys):"
-            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-            + "\nDo not nest objects (no {\"score\":..., \"justification\":...}); place justification only in 'comment'."
-            + "\nDo not include code fences or any text before or after the JSON."
-        )
-    if variant == 1:
-        return (
-            "Evaluate the answer strictly per the rubric below and return only JSON.\n\n"
-            + f"Participant answer: {participant}\n"
-            + f"Expected answer: {expected}\n"
-            + f"Question: {question}\n\n"
-            + "Keys: completeness, conciseness, correctness, comment. Scores must be numeric 0-5."
-            + "\nReturn exactly this JSON shape (no extra keys):"
-            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-            + "\nNo nested objects, no arrays, no code fences, no prose outside the JSON."
-        )
-    if variant == 2:
-        return (
-            "You are a careful grader. Score on a 0-5 numeric scale for each criterion and justify briefly.\n\n"
-            + f"Question: {question}\n"
-            + f"Participant answer: {participant}\n"
-            + f"Expected answer: {expected}\n\n"
-            + "Return JSON with completeness, conciseness, correctness, comment. Scores must be numbers in [0,5]."
-            + "\nFormat (exact keys, no extras):"
-            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-            + "\nDo not return nested objects like {\"score\":..., \"justification\":...}."
-            + "\nDo not include code fences or any text outside the JSON."
-        )
-    # variant 3
-    return (
-        "Return JSON only. Consider correctness most important, then completeness, then conciseness.\n\n"
-        + f"Expected answer: {expected}\n"
-        + f"Question: {question}\n"
-        + f"Participant answer: {participant}\n\n"
-        + "Fields: completeness, conciseness, correctness, comment. Each score must be numeric 0-5."
-        + "\nExact output JSON (no extra keys, no nesting):"
-        + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
-        + "\nNo code fences, no prose before/after."
-    )
 
 
 def _call_openai_chat(prompt: str, model: str) -> str:
@@ -335,7 +286,7 @@ def llm_evaluate_self_consistent(
     results: List[Dict[str, Any]] = []
 
     if runs == 1:
-        prompt = _build_prompt_variant(0, question, expected, answer)
+        prompt = build_prompt_variant(0, question, expected, answer)
         content = _call_openai_chat(prompt, model)
         parsed = parse_response(content)
         results.append(parsed)
@@ -343,7 +294,7 @@ def llm_evaluate_self_consistent(
         max_workers = min(runs, _OPENAI_CONCURRENCY)
         def _task(i: int) -> Optional[Dict[str, Any]]:
             try:
-                p = _build_prompt_variant(i, question, expected, answer)
+                p = build_prompt_variant(i, question, expected, answer)
                 c = _call_openai_chat(p, model)
                 return parse_response(c)
             except Exception:

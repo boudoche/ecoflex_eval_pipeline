@@ -1,0 +1,18 @@
+{
+  "participant_id": "DemoTeam",
+  "answers": [
+    {
+      "question_id": "Q1",
+      "answer": "EcoFlex Home, EcoFlex Industrial, EcoFlex Multi-Residential, AquaSentinel, and the weekly report project."
+    },
+    {
+      "question_id": "Q2",
+      "answer": "EcoFlex is a modular energy optimization platform with ML-based forecasts, predictive source switching, and dashboards for real-time and historical insights."
+    },
+    {
+      "question_id": "Q8",
+      "answer": "Freya won the Snow Games with 29 points."
+    }
+  ]
+}
+

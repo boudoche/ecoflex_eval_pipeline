@@ -140,3 +140,51 @@ def parse_response(response: str) -> Dict[str, Any]:
         except Exception:
             pass
     raise ValueError("No valid JSON object found in response")
+
+
+def build_prompt_variant(idx: int, question: str, expected: str, participant: str) -> str:
+    """Return a slightly varied prompt to promote self-consistency.
+
+    Variations permute field order and lightly rephrase instructions. All variants
+    strictly require numeric 0–5 scores and a flat JSON schema with the exact keys
+    completeness, conciseness, correctness, and comment.
+    """
+    variant = idx % 4
+    if variant == 0:
+        return (
+            build_prompt(question, expected, participant)
+        )
+    if variant == 1:
+        return (
+            "Evaluate the answer strictly per the rubric below and return only JSON.\n\n"
+            + f"Participant answer: {participant}\n"
+            + f"Expected answer: {expected}\n"
+            + f"Question: {question}\n\n"
+            + "Keys: completeness, conciseness, correctness, comment. Scores must be numeric 0-5."
+            + "\nReturn exactly this JSON shape (no extra keys):"
+            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+            + "\nNo nested objects, no arrays, no code fences, no prose outside the JSON."
+        )
+    if variant == 2:
+        return (
+            "You are a careful grader. Score on a 0-5 numeric scale for each criterion and justify briefly.\n\n"
+            + f"Question: {question}\n"
+            + f"Participant answer: {participant}\n"
+            + f"Expected answer: {expected}\n\n"
+            + "Return JSON with completeness, conciseness, correctness, comment. Scores must be numbers in [0,5]."
+            + "\nFormat (exact keys, no extras):"
+            + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+            + "\nDo not return nested objects like {\"score\":..., \"justification\":...}."
+            + "\nDo not include code fences or any text outside the JSON."
+        )
+    # variant 3
+    return (
+        "Return JSON only. Consider correctness most important, then completeness, then conciseness.\n\n"
+        + f"Expected answer: {expected}\n"
+        + f"Question: {question}\n"
+        + f"Participant answer: {participant}\n\n"
+        + "Fields: completeness, conciseness, correctness, comment. Each score must be numeric 0-5."
+        + "\nExact output JSON (no extra keys, no nesting):"
+        + "\n{\"completeness\": <number 0-5>, \"conciseness\": <number 0-5>, \"correctness\": <number 0-5>, \"comment\": \"<brief justification>\"}"
+        + "\nNo code fences, no prose before/after."
+    )
