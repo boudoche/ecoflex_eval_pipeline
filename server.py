@@ -30,6 +30,8 @@ FIXED_WORKERS = int(os.getenv("FIXED_WORKERS", "6"))
 # Token sources
 TOKENS_PATH = os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json"))
 TEAM_TOKENS = os.getenv("TEAM_TOKENS", "")  # format: token:Team[:email],token:Team[:email]
+# Max submission size (in bytes, default 5MB)
+MAX_SUBMISSION_SIZE = int(os.getenv("MAX_SUBMISSION_SIZE", str(5 * 1024 * 1024)))
 
 # Logging configuration (includes filename and line number)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -334,6 +336,14 @@ async def grade_submission(
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
 
+    # Check content length before reading body
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_SUBMISSION_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Submission too large. Maximum size: {MAX_SUBMISSION_SIZE / (1024*1024):.1f}MB"
+        )
+
     try:
         body = await request.json()
     except Exception:
@@ -383,17 +393,17 @@ async def grade_submission(
                 )
             # Write CSV using shared helper on executor
             await _run_in_executor(write_summary_csv, csv_path, rows)
+            # Also write XLSX per participant
+            await _run_in_executor(_write_team_xlsx, RESULTS_DIR, pid, result.get("questions", []))
             # Mark token as used and persist
             info["used"] = True
             _state["token_to_info"][token] = info
             _persist_tokens(_state["token_to_info"])
-            # Send confirmation email (best-effort)
+            # Send confirmation email AFTER all processing is complete (best-effort)
             try:
                 _send_confirmation_email(info.get("email", ""), team, sub)
             except Exception:
                 logger.exception("Email confirmation failed for team %s", team)
-            # Also write XLSX per participant
-            await _run_in_executor(_write_team_xlsx, RESULTS_DIR, pid, result.get("questions", []))
         except Exception as exc:
             logger.exception("Failed to write results for participant %s", pid)
             raise HTTPException(status_code=500, detail=f"Failed to write results: {exc}")
@@ -414,6 +424,14 @@ async def grade_batch(
     questions = _state.get("questions") or {}
     if not questions:
         raise HTTPException(status_code=500, detail="Questions not loaded")
+
+    # Check content length before reading body
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_SUBMISSION_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Submission too large. Maximum size: {MAX_SUBMISSION_SIZE / (1024*1024):.1f}MB"
+        )
 
     try:
         items = await request.json()
@@ -483,10 +501,11 @@ async def grade_batch(
     if write_files:
         try:
             await _run_in_executor(write_summary_csv, csv_path, all_rows)
-            # After batch, mark token used and persist; send single confirmation
+            # After batch, mark token used and persist
             info["used"] = True
             _state["token_to_info"][token] = info
             _persist_tokens(_state["token_to_info"])
+            # Send confirmation email AFTER all processing is complete (best-effort)
             try:
                 _send_confirmation_email(info.get("email", ""), team, {"submissions": items})
             except Exception:

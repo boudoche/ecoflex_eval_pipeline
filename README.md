@@ -143,6 +143,8 @@ Server behavior:
 - Self‑consistency default is 3 runs; override via env: `SELF_CONSISTENCY_RUNS` (e.g., 5).
 - Supports scoring weights via env: `WEIGHT_COMPLETENESS`, `WEIGHT_CONCISENESS`, `WEIGHT_CORRECTNESS`.
 - Requires a submission token header; maps token → team.
+- Max submission size: 5MB (default); configure via `MAX_SUBMISSION_SIZE` env (in bytes).
+- Email confirmation sent AFTER all processing (JSON, CSV, XLSX) is complete.
 
 ### Token Management
 
