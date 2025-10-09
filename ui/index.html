@@ -125,6 +125,12 @@
         showMessage('Please upload a .json file.', false);
         return;
       }
+      // Check file size (5MB limit)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size > maxSize) {
+        showMessage(`File too large (${(file.size / (1024*1024)).toFixed(2)}MB). Maximum size: 5.0MB`, false);
+        return;
+      }
       showFileChip(file.name);
       const reader = new FileReader();
       reader.onload = () => {
@@ -176,6 +182,13 @@
           showMessage('Submission complete.');
         } else if (res.status === 401) {
           showMessage('Invalid or missing token.', false);
+        } else if (res.status === 413) {
+          let errText = 'Submission too large. Maximum size: 5.0MB';
+          try {
+            const data = await res.json();
+            if (data && data.detail) errText = data.detail;
+          } catch {}
+          showMessage(errText, false);
         } else {
           let errText = 'Submission failed. Please try again.';
           try {

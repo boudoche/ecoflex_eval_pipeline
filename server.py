@@ -329,20 +329,20 @@ async def grade_submission(
     write_files: bool = Query(True, description="Write JSON and update summary.csv on disk"),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
-    token, info = _require_token_and_team(x_submission_token)
-    team = info.get("team", "unknown")
-
-    questions = _state.get("questions") or {}
-    if not questions:
-        raise HTTPException(status_code=500, detail="Questions not loaded")
-
-    # Check content length before reading body
+    # Check content length FIRST before any other processing
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_SUBMISSION_SIZE:
         raise HTTPException(
             status_code=413,
             detail=f"Submission too large. Maximum size: {MAX_SUBMISSION_SIZE / (1024*1024):.1f}MB"
         )
+
+    token, info = _require_token_and_team(x_submission_token)
+    team = info.get("team", "unknown")
+
+    questions = _state.get("questions") or {}
+    if not questions:
+        raise HTTPException(status_code=500, detail="Questions not loaded")
 
     try:
         body = await request.json()
@@ -418,20 +418,20 @@ async def grade_batch(
     write_files: bool = Query(True),
     x_submission_token: Optional[str] = Header(None, alias="X-Submission-Token"),
 ) -> Dict[str, Any]:
-    token, info = _require_token_and_team(x_submission_token)
-    team = info.get("team", "unknown")
-
-    questions = _state.get("questions") or {}
-    if not questions:
-        raise HTTPException(status_code=500, detail="Questions not loaded")
-
-    # Check content length before reading body
+    # Check content length FIRST before any other processing
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_SUBMISSION_SIZE:
         raise HTTPException(
             status_code=413,
             detail=f"Submission too large. Maximum size: {MAX_SUBMISSION_SIZE / (1024*1024):.1f}MB"
         )
+
+    token, info = _require_token_and_team(x_submission_token)
+    team = info.get("team", "unknown")
+
+    questions = _state.get("questions") or {}
+    if not questions:
+        raise HTTPException(status_code=500, detail="Questions not loaded")
 
     try:
         items = await request.json()

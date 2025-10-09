@@ -143,7 +143,10 @@ Server behavior:
 - Self‑consistency default is 3 runs; override via env: `SELF_CONSISTENCY_RUNS` (e.g., 5).
 - Supports scoring weights via env: `WEIGHT_COMPLETENESS`, `WEIGHT_CONCISENESS`, `WEIGHT_CORRECTNESS`.
 - Requires a submission token header; maps token → team.
-- Max submission size: 5MB (default); configure via `MAX_SUBMISSION_SIZE` env (in bytes).
+- **Max submission size: 5MB (default)**; configure via `MAX_SUBMISSION_SIZE` env (in bytes).
+  - Size check happens **immediately** before any token validation or API calls.
+  - Client-side (UI) checks file size before upload and displays error if too large.
+  - Server returns 413 status code with clear error message if limit exceeded.
 - Email confirmation sent AFTER all processing (JSON, CSV, XLSX) is complete.
 
 ### Token Management
