@@ -19,7 +19,10 @@ adapted to other scenarios with minimal changes.
   will be saved here (you must create this directory or specify
   another path).
 - `server.py` — FastAPI service to accept submissions over HTTP and grade them.
-- `ui/index.html` — Minimal drag‑and‑drop web UI that posts submissions to the API.
+- `ui/` — Web interface for submissions.
+  - `index.html` — Drag‑and‑drop submission UI.
+  - `assets/` — Visual assets (logos, images, etc.).
+    See [ui/assets/README.md](ui/assets/README.md) for details.
 - `testing/` — Testing framework for comparing LLM providers and models.
   See [testing/README.md](testing/README.md) for details.
 

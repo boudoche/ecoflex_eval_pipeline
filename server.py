@@ -147,7 +147,7 @@ def _send_confirmation_email(to_addr: str, participant_id: str, submission_json:
     user = os.getenv("SMTP_USER", "")
     password = os.getenv("SMTP_PASS", "")
     from_addr = os.getenv("SMTP_FROM", user)
-    from_name = os.getenv("SMTP_FROM_NAME", "Ecoflex Hackathon")
+    from_name = os.getenv("SMTP_FROM_NAME", "Argusa Data Challenge")
     reply_to = os.getenv("SMTP_REPLY_TO", from_addr)
     use_ssl = os.getenv("SMTP_USE_SSL", "").lower() in ("1", "true", "yes", "on")
     if not host or not from_addr:
@@ -174,18 +174,21 @@ Your submission has been received successfully!
 Submission Details:
 - Team/Participant: {participant_id}
 - Number of answers: {len(submission_json.get('answers', []))}
-- Status: Processing
+- Status: Received
 
 Your submission file is attached to this email for your records.
 
 We will notify you once the evaluation is complete.
 
 Best regards,
-The Ecoflex Team
+The Argusa Data Challenge Team
 
 ---
 This is an automated message. Please do not reply to this email.
 """
+    
+    # Get logo URL from environment (optional)
+    logo_url = os.getenv("EMAIL_LOGO_URL", "")
     
     html_body = f"""<!DOCTYPE html>
 <html>
@@ -193,30 +196,64 @@ This is an automated message. Please do not reply to this email.
     <meta charset="utf-8">
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }}
-        .content {{ background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }}
-        .details {{ background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #4CAF50; }}
-        .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
-        .success {{ color: #4CAF50; font-weight: bold; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; }}
+        .header {{ 
+            background: linear-gradient(135deg, #004B87 0%, #004B87 25%, #FDB913 25%, #FDB913 50%, #000000 50%, #000000 75%, #E94E1B 75%, #E94E1B 100%);
+            color: white; 
+            padding: 30px 20px; 
+            text-align: center; 
+            border-radius: 5px 5px 0 0;
+        }}
+        .logo {{ max-width: 200px; height: auto; margin-bottom: 15px; }}
+        .header h1 {{ margin: 0; font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }}
+        .content {{ background-color: #f9f9f9; padding: 30px 20px; border: 1px solid #ddd; }}
+        .details {{ 
+            background-color: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-left: 5px solid #004B87;
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .details h3 {{ color: #004B87; margin-top: 0; }}
+        .details ul {{ list-style: none; padding: 0; }}
+        .details li {{ padding: 8px 0; border-bottom: 1px solid #f0f0f0; }}
+        .details li:last-child {{ border-bottom: none; }}
+        .footer {{ 
+            text-align: center; 
+            margin-top: 20px; 
+            padding: 20px;
+            font-size: 12px; 
+            color: #666;
+            background-color: #f5f5f5;
+            border-radius: 0 0 5px 5px;
+        }}
+        .success {{ color: #004B87; font-weight: bold; font-size: 18px; }}
+        .brand-bar {{
+            height: 8px;
+            background: linear-gradient(90deg, #004B87 0%, #004B87 25%, #FDB913 25%, #FDB913 50%, #000000 50%, #000000 75%, #E94E1B 75%, #E94E1B 100%);
+            margin-bottom: 20px;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
+            {"<img src='" + logo_url + "' alt='Argusa Logo' class='logo' />" if logo_url else ""}
             <h1>✓ Submission Received</h1>
         </div>
+        <div class="brand-bar"></div>
         <div class="content">
             <p>Hello <strong>{participant_id}</strong>,</p>
             
             <p class="success">Your submission has been received successfully!</p>
             
             <div class="details">
-                <h3>Submission Details:</h3>
+                <h3>Submission Details</h3>
                 <ul>
                     <li><strong>Team/Participant:</strong> {participant_id}</li>
                     <li><strong>Number of answers:</strong> {len(submission_json.get('answers', []))}</li>
-                    <li><strong>Status:</strong> Processing</li>
+                    <li><strong>Status:</strong> Received</li>
                 </ul>
             </div>
             
@@ -225,9 +262,10 @@ This is an automated message. Please do not reply to this email.
             <p>We will notify you once the evaluation is complete.</p>
             
             <p>Best regards,<br>
-            <strong>The Ecoflex Team</strong></p>
+            <strong>The Argusa Data Challenge Team</strong></p>
         </div>
         <div class="footer">
+            <div class="brand-bar" style="margin-bottom: 10px;"></div>
             <p>This is an automated message. Please do not reply to this email.</p>
         </div>
     </div>
