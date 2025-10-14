@@ -33,3 +33,20 @@ __pycache__/
 
 # UI assets are NOT ignored - we want to commit them
 # (removed Argusa-Charte-couleur-fontes.pdf from ignore)
+testing/TESTING_SUMMARY.md
+testing/test_models.py
+testing/test_api_connection.py
+testing/test_injection.py
+testing/test_all_providers.py
+testing/show_providers.py
+testing/setup_providers.sh
+testing/setup_ollama.sh
+testing/requirements-testing.txt
+testing/README.md
+testing/QUICKSTART.md
+testing/PROVIDER_COMPARISON.md
+testing/QUICK_MODEL_TEST.md
+testing/OLLAMA_SETUP.md
+testing/MULTI_PROVIDER_TESTING.md
+testing/MODEL_TESTING.md
+testing/change_model.sh
