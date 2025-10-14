@@ -147,15 +147,99 @@ def _send_confirmation_email(to_addr: str, participant_id: str, submission_json:
     user = os.getenv("SMTP_USER", "")
     password = os.getenv("SMTP_PASS", "")
     from_addr = os.getenv("SMTP_FROM", user)
+    from_name = os.getenv("SMTP_FROM_NAME", "Ecoflex Hackathon")
+    reply_to = os.getenv("SMTP_REPLY_TO", from_addr)
     use_ssl = os.getenv("SMTP_USE_SSL", "").lower() in ("1", "true", "yes", "on")
     if not host or not from_addr:
         logger.warning("Email disabled: SMTP_HOST/SMTP_FROM not configured")
         return
+    
+    # Build email with proper headers to avoid spam
     msg = EmailMessage()
-    msg["From"] = from_addr
+    msg["From"] = f"{from_name} <{from_addr}>"
     msg["To"] = to_addr
-    msg["Subject"] = f"Ecoflex submission received - {participant_id}"
-    msg.set_content("Your submission was received successfully. Attached is a copy of your JSON file.")
+    msg["Reply-To"] = reply_to
+    msg["Subject"] = f"✓ Submission Received - {participant_id}"
+    
+    # Add additional headers to improve deliverability
+    msg["X-Mailer"] = "Ecoflex Auto Grader"
+    msg["X-Priority"] = "3"  # Normal priority
+    msg["Importance"] = "Normal"
+    
+    # Create a more professional email body (plain text + HTML)
+    text_body = f"""Hello {participant_id},
+
+Your submission has been received successfully!
+
+Submission Details:
+- Team/Participant: {participant_id}
+- Number of answers: {len(submission_json.get('answers', []))}
+- Status: Processing
+
+Your submission file is attached to this email for your records.
+
+We will notify you once the evaluation is complete.
+
+Best regards,
+The Ecoflex Team
+
+---
+This is an automated message. Please do not reply to this email.
+"""
+    
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }}
+        .content {{ background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }}
+        .details {{ background-color: white; padding: 15px; margin: 15px 0; border-left: 4px solid #4CAF50; }}
+        .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
+        .success {{ color: #4CAF50; font-weight: bold; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✓ Submission Received</h1>
+        </div>
+        <div class="content">
+            <p>Hello <strong>{participant_id}</strong>,</p>
+            
+            <p class="success">Your submission has been received successfully!</p>
+            
+            <div class="details">
+                <h3>Submission Details:</h3>
+                <ul>
+                    <li><strong>Team/Participant:</strong> {participant_id}</li>
+                    <li><strong>Number of answers:</strong> {len(submission_json.get('answers', []))}</li>
+                    <li><strong>Status:</strong> Processing</li>
+                </ul>
+            </div>
+            
+            <p>Your submission file is attached to this email for your records.</p>
+            
+            <p>We will notify you once the evaluation is complete.</p>
+            
+            <p>Best regards,<br>
+            <strong>The Ecoflex Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    
+    # Set both plain text and HTML versions
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
+    
+    # Attach submission JSON
     payload = json.dumps(submission_json, indent=2, ensure_ascii=False).encode("utf-8")
     msg.add_attachment(payload, maintype="application", subtype="json", filename=f"{participant_id}_submission.json")
     try:
