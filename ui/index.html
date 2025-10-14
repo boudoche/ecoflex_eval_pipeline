@@ -415,11 +415,11 @@
           message.innerHTML = '<span class="success-icon">✅</span> <strong>Submission Complete!</strong><br><small>Your answers have been received and are being evaluated. You will receive a confirmation email shortly.</small>';
           message.className = 'msg ok';
           
-          // Clear the form
+          // Clear the form after 30 seconds
           setTimeout(() => {
             clearFileSelection();
             tokenEl.value = '';
-          }, 2000);
+          }, 30000);
         } else if (res.status === 401) {
           showMessage('❌ Invalid or missing token. Please check your submission token.', false);
         } else if (res.status === 413) {
