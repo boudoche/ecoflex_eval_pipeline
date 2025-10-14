@@ -20,6 +20,8 @@ adapted to other scenarios with minimal changes.
   another path).
 - `server.py` — FastAPI service to accept submissions over HTTP and grade them.
 - `ui/index.html` — Minimal drag‑and‑drop web UI that posts submissions to the API.
+- `testing/` — Testing framework for comparing LLM providers and models.
+  See [testing/README.md](testing/README.md) for details.
 
 ## Running the Evaluator (CLI)
 
