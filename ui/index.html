@@ -219,6 +219,33 @@
       box-shadow: none;
     }
     
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Success Animation */
+    .success-icon {
+      display: inline-block;
+      font-size: 2rem;
+      animation: bounce 0.6s ease-out;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+    
     .hidden { display: none; }
     input[type="file"] { display: none; }
   </style>
@@ -359,10 +386,19 @@
       clearMessage();
       const token = (tokenEl.value || '').trim();
       if (!token) { showMessage('Submission token is required.', false); return; }
+      
       // Coerce payload shape: if it's an array, wrap as {answers: [...]}
       let bodyPayload = Array.isArray(payload) ? { answers: payload } : payload;
+      
+      // Disable button and show loading spinner
       submitBtn.disabled = true;
-      showMessage('Submitting...');
+      const originalButtonText = submitBtn.innerHTML;
+      submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
+      
+      // Show loading message
+      message.innerHTML = '<span class="spinner"></span>Processing your submission...';
+      message.className = 'msg ok';
+      
       try {
         const params = new URLSearchParams({ use_llm: 'true', write_files: 'true' });
         const res = await fetch(`/grade?${params.toString()}`, {
@@ -373,28 +409,39 @@
           },
           body: JSON.stringify(bodyPayload),
         });
+        
         if (res.ok) {
-          showMessage('Submission complete.');
+          // Success! Show animated success message
+          message.innerHTML = '<span class="success-icon">✅</span> <strong>Submission Complete!</strong><br><small>Your answers have been received and are being evaluated. You will receive a confirmation email shortly.</small>';
+          message.className = 'msg ok';
+          
+          // Clear the form
+          setTimeout(() => {
+            clearFileSelection();
+            tokenEl.value = '';
+          }, 2000);
         } else if (res.status === 401) {
-          showMessage('Invalid or missing token.', false);
+          showMessage('❌ Invalid or missing token. Please check your submission token.', false);
         } else if (res.status === 413) {
-          let errText = 'Submission too large. Maximum size: 5.0MB';
+          let errText = '❌ Submission too large. Maximum size: 5.0MB';
           try {
             const data = await res.json();
-            if (data && data.detail) errText = data.detail;
+            if (data && data.detail) errText = '❌ ' + data.detail;
           } catch {}
           showMessage(errText, false);
         } else {
-          let errText = 'Submission failed. Please try again.';
+          let errText = '❌ Submission failed. Please try again.';
           try {
             const data = await res.json();
-            if (data && data.detail) errText = data.detail;
+            if (data && data.detail) errText = '❌ ' + data.detail;
           } catch {}
           showMessage(errText, false);
         }
       } catch (e) {
-        showMessage('Network error. Please try again.', false);
+        showMessage('❌ Network error. Please check your connection and try again.', false);
       } finally {
+        // Restore button
+        submitBtn.innerHTML = originalButtonText;
         submitBtn.disabled = false;
       }
     });
