@@ -16,7 +16,6 @@ submissions/Michaela1_submission.json
 
 # Testing artifacts (now in testing/ folder)
 testing/test_results/*.xlsx
-testing/*
 testing/test_large_submission.json
 testing/model_test_*.json
 testing/model_comparison_*.json
@@ -31,4 +30,6 @@ testing/multi_provider_*.json
 __pycache__/
 *.pyc
 *.pyo
-Argusa-Charte-couleur-fontes.pdf
+
+# UI assets are NOT ignored - we want to commit them
+# (removed Argusa-Charte-couleur-fontes.pdf from ignore)
