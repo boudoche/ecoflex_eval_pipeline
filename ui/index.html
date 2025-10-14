@@ -3,63 +3,254 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ecoflex Submission</title>
+  <title>Argusa Data Challenge - Submission</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; color: #111827; }
-    h1 { margin-bottom: 0.25rem; }
-    .sub { color: #6b7280; margin-bottom: 1.25rem; }
-    .dropzone {
-      border: 2px dashed #2563eb;
-      background: #f8fafc;
-      border-radius: 14px;
-      padding: 2.25rem;
-      text-align: center;
-      color: #475569;
-      transition: background 0.2s, border-color 0.2s;
-      max-width: 680px;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+      color: #111827; 
+      background: #f5f5f5;
+      min-height: 100vh;
+    }
+    
+    /* Argusa Header Banner */
+    .header-banner {
+      background: #004B87;
+      padding: 2rem 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       position: relative;
     }
-    .dropzone.dragover { background: #eff6ff; border-color: #1d4ed8; }
-    .note { margin-top: 0.75rem; font-size: 0.9rem; color: #6b7280; }
+    .header-banner::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #004B87 0%, #004B87 25%, #FDB913 25%, #FDB913 50%, #000000 50%, #000000 75%, #E94E1B 75%, #E94E1B 100%);
+    }
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    .logo {
+      height: 60px;
+      width: auto;
+    }
+    .header-title {
+      color: white;
+      font-size: 1.75rem;
+      font-weight: 600;
+    }
+    
+    /* Main Container */
+    .container {
+      max-width: 700px;
+      margin: 3rem auto;
+      padding: 0 2rem;
+    }
+    
+    /* Token Input Box */
+    .token-box {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-left: 4px solid #004B87;
+    }
+    .token-box label {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #004B87;
+      margin-bottom: 0.5rem;
+    }
+    .token-box input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    .token-box input:focus {
+      outline: none;
+      border-color: #004B87;
+    }
+    
+    /* Dropzone */
+    .dropzone {
+      background: white;
+      border: 3px dashed #004B87;
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      color: #475569;
+      transition: all 0.2s;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .dropzone:hover {
+      border-color: #FDB913;
+      background: #fffbf0;
+    }
+    .dropzone.dragover { 
+      background: #e8f4ff; 
+      border-color: #FDB913;
+      transform: scale(1.02);
+    }
+    .dropzone-text {
+      font-size: 1.1rem;
+      color: #004B87;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    .note { 
+      margin-top: 0.75rem; 
+      font-size: 0.95rem; 
+      color: #6b7280; 
+    }
+    .link { 
+      color: #E94E1B; 
+      text-decoration: underline; 
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .link:hover {
+      color: #FDB913;
+    }
+    
+    /* File List */
+    .file-list { 
+      display: flex; 
+      justify-content: center; 
+      gap: 0.5rem; 
+      flex-wrap: wrap; 
+      margin-top: 1.5rem; 
+    }
+    .file-chip { 
+      display: inline-flex; 
+      align-items: center; 
+      gap: 0.5rem; 
+      background: #004B87; 
+      color: white;
+      padding: 0.5rem 1rem; 
+      border-radius: 9999px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .file-dot { 
+      width: 8px; 
+      height: 8px; 
+      background: #FDB913; 
+      border-radius: 50%; 
+    }
+    .file-close { 
+      width: 20px; 
+      height: 20px; 
+      display: inline-flex; 
+      align-items: center; 
+      justify-content: center; 
+      border-radius: 9999px; 
+      background: rgba(255,255,255,0.2); 
+      color: white; 
+      cursor: pointer; 
+      border: none;
+      font-size: 16px; 
+      line-height: 1;
+      transition: background 0.2s;
+    }
+    .file-close:hover { 
+      background: rgba(255,255,255,0.3); 
+    }
+    
+    /* Messages */
+    .msg { 
+      margin-top: 1.5rem; 
+      padding: 1rem 1.25rem; 
+      border-radius: 10px; 
+      font-weight: 500;
+    }
+    .ok { 
+      background: #ecfdf5; 
+      color: #065f46; 
+      border: 2px solid #10b981; 
+    }
+    .err { 
+      background: #fef2f2; 
+      color: #991b1b; 
+      border: 2px solid #ef4444; 
+    }
+    
+    /* Submit Button */
+    .submit-container {
+      margin-top: 2rem;
+      text-align: center;
+    }
+    button { 
+      background: linear-gradient(135deg, #E94E1B 0%, #FDB913 100%);
+      color: white; 
+      border: 0; 
+      padding: 1rem 3rem; 
+      border-radius: 12px; 
+      cursor: pointer;
+      font-size: 1.1rem;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(233, 78, 27, 0.3);
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(233, 78, 27, 0.4);
+    }
+    button:disabled { 
+      background: #d1d5db; 
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
     .hidden { display: none; }
-    .msg { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 10px; max-width: 680px; }
-    .ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-    .err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-    .row { margin-top: 0.75rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
-    button { background: #2563eb; color: white; border: 0; padding: 0.6rem 1.1rem; border-radius: 10px; cursor: pointer; }
-    button:disabled { background: #93c5fd; cursor: not-allowed; }
     input[type="file"] { display: none; }
-    .link { color: #2563eb; text-decoration: underline; cursor: pointer; }
-    input[type="text"] { padding: 0.5rem 0.6rem; border: 1px solid #d1d5db; border-radius: 8px; width: 320px; }
-    label { font-size: 0.9rem; color: #374151; }
-    /* File chip */
-    .file-list { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
-    .file-chip { display: inline-flex; align-items: center; gap: 0.5rem; background: #ffffff; border: 1px solid #e5e7eb; color: #374151; padding: 0.35rem 0.6rem; border-radius: 9999px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); font-size: 0.9rem; }
-    .file-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; }
-    .file-close { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; background: #f3f4f6; color: #6b7280; cursor: pointer; border: 1px solid #e5e7eb; font-size: 12px; line-height: 1; }
-    .file-close:hover { background: #e5e7eb; }
   </style>
 </head>
 <body>
-  <h1>Submit your answers</h1>
-  <div class="sub">Drop your JSON file below to submit. Provide the submission token you received.</div>
-
-  <div class="row">
-    <label for="token">Submission token</label>
-    <input id="token" type="text" placeholder="Paste your token" autocomplete="off" />
+  <!-- Argusa Header Banner -->
+  <div class="header-banner">
+    <div class="header-content">
+      <img src="assets/images/argusa-square.png" alt="Argusa" class="logo">
+      <h1 class="header-title">Data Challenge - Submission Portal</h1>
+    </div>
   </div>
 
-  <div id="dropzone" class="dropzone" style="margin-top: 0.75rem;">
-    Drag & drop your JSON file here
-    <div class="note">or <span id="browse" class="link">choose a file</span></div>
-    <div id="fileList" class="file-list hidden"></div>
-    <input id="fileInput" type="file" accept="application/json,.json" />
-  </div>
+  <!-- Main Content -->
+  <div class="container">
+    <!-- Token Input -->
+    <div class="token-box">
+      <label for="token">Submission Token</label>
+      <input id="token" type="text" placeholder="Paste your submission token here" autocomplete="off" />
+    </div>
 
-  <div id="message" class="msg hidden"></div>
+    <!-- Dropzone -->
+    <div id="dropzone" class="dropzone">
+      <div class="dropzone-text">📄 Drag & drop your JSON file here</div>
+      <div class="note">or <span id="browse" class="link">browse to choose a file</span></div>
+      <div id="fileList" class="file-list hidden"></div>
+      <input id="fileInput" type="file" accept="application/json,.json" />
+    </div>
 
-  <div class="row">
-    <button id="submitBtn" disabled>Submit</button>
+    <!-- Message -->
+    <div id="message" class="msg hidden"></div>
+
+    <!-- Submit Button -->
+    <div class="submit-container">
+      <button id="submitBtn" disabled>Submit Answers</button>
+    </div>
   </div>
 
   <script>
