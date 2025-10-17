@@ -215,6 +215,26 @@ A lightweight token‑based heuristic computes all three scores without calling 
 - Temperature is 0.0 to minimize randomness.
 - Global OpenAI concurrency limit per process with retries/backoff on transient errors.
 
+### Dual-Model Evaluation (Server Default)
+
+The server uses **dual-model evaluation** to increase scoring reliability:
+
+- **Two models run in parallel**: OpenAI GPT-4o-mini + Anthropic Claude 4.5 Haiku (Oct 2025)
+- **2 variants per model** = 4 total scores per answer (self-consistency)
+- **Median aggregation** across all 4 scores for the final result
+- **Parallel API calls** with rate limiting to maximize speed while respecting API limits
+- **XLSX output** includes a "variant model" column showing which model generated each score
+
+To enable dual-model mode, both API keys must be set:
+```bash
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Rate limits (configurable via env):
+- `OPENAI_CONCURRENCY=6` (default, for ~6 RPM)
+- `ANTHROPIC_CONCURRENCY=3` (default, for ~50 RPM with conservative limit)
+
 ### Parallelization
 
 - Within a single submission, answers are graded concurrently (thread pool).

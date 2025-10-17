@@ -38,13 +38,23 @@ try:
 except ImportError:
     openai = None  # type: ignore
 
+try:
+    import anthropic  # type: ignore
+except ImportError:
+    anthropic = None  # type: ignore
+
 
 DEFAULT_WEIGHTS: Tuple[float, float, float] = (0.3, 0.2, 0.5)
 MODEL_NAME = "gpt-4o-mini"
+ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 # Global OpenAI concurrency limiter (per-process)
 _OPENAI_CONCURRENCY = max(1, int(os.getenv("OPENAI_CONCURRENCY", "6")))
 _OPENAI_SEMAPHORE = threading.Semaphore(_OPENAI_CONCURRENCY)
+
+# Global Anthropic concurrency limiter (50 RPM, so more conservative)
+_ANTHROPIC_CONCURRENCY = max(1, int(os.getenv("ANTHROPIC_CONCURRENCY", "3")))
+_ANTHROPIC_SEMAPHORE = threading.Semaphore(_ANTHROPIC_CONCURRENCY)
 
 # Default self-consistency runs (can be overridden by env and CLI)
 DEFAULT_SC_RUNS = int(os.getenv("SELF_CONSISTENCY_RUNS", "3"))
@@ -261,6 +271,57 @@ def _call_openai_chat(prompt: str, model: str) -> str:
     raise RuntimeError("Unreachable: exhausted retries without raising")
 
 
+def _call_anthropic_chat(prompt: str, model: str) -> str:
+    """Call Anthropic Claude API with global concurrency limit and retry/backoff.
+    
+    Returns the assistant content string.
+    """
+    if anthropic is None:
+        raise RuntimeError("anthropic module is not installed; install anthropic or use OpenAI only")
+    
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    
+    max_retries = 4
+    base_delay = 0.5
+    
+    for attempt in range(max_retries + 1):
+        with _ANTHROPIC_SEMAPHORE:
+            try:
+                client = anthropic.Anthropic(api_key=api_key)
+                message = client.messages.create(
+                    model=model,
+                    max_tokens=1024,
+                    temperature=0.0,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                content = message.content[0].text
+                if LLM_LOG_RESPONSES:
+                    _LLM_LOGGER.info("Anthropic model=%s response=%s", model, content)
+                else:
+                    _LLM_LOGGER.debug("Anthropic model=%s response=%s", model, content)
+                if LLM_LOG_TO_FILE:
+                    try:
+                        os.makedirs(os.path.dirname(LLM_LOG_FILE), exist_ok=True)
+                        with _LLM_FILE_LOCK:
+                            with open(LLM_LOG_FILE, "a", encoding="utf-8") as fh:
+                                fh.write(f"\n=== ANTHROPIC RESPONSE | model={model} | ts={time.time()} ===\n")
+                                fh.write(content)
+                                fh.write("\n=== END ANTHROPIC RESPONSE ===\n")
+                    except Exception:
+                        pass
+                return content
+            except Exception as e:
+                if attempt >= max_retries:
+                    raise RuntimeError(f"Anthropic API request failed after retries: {e}")
+        # Jittered exponential backoff
+        sleep_seconds = base_delay * (2 ** attempt) * (1.0 + random.random() * 0.25)
+        time.sleep(sleep_seconds)
+    
+    raise RuntimeError("Unreachable: exhausted retries without raising")
+
+
 def sanitize_participant_answer(text: str) -> str:
     """Remove code fences and suspicious patterns that could confuse the LLM.
     
@@ -398,6 +459,141 @@ def llm_evaluate_self_consistent(
     return agg
 
 
+def llm_evaluate_dual_model(
+    question: str,
+    expected: str,
+    answer: str,
+    openai_model: str,
+    anthropic_model: str,
+    runs_per_model: int,
+) -> Dict[str, Any]:
+    """Run dual-model evaluation with self-consistency for each model.
+    
+    Runs both OpenAI and Anthropic models in parallel, each with self-consistency variants.
+    Returns aggregated results with 4 total scores (2 per model × 2 variants each by default).
+    The final score is the median of all 4 variant scores.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    # Sanitize once before all evaluations
+    sanitized_answer = sanitize_participant_answer(answer)
+    
+    def run_openai_variants() -> List[Dict[str, Any]]:
+        """Run OpenAI model with variants."""
+        results = []
+        def _task(i: int) -> Optional[Dict[str, Any]]:
+            try:
+                p = build_prompt_variant(i, question, expected, sanitized_answer)
+                c = _call_openai_chat(p, openai_model)
+                parsed = parse_response(c)
+                parsed["model"] = openai_model
+                parsed["variant_id"] = i
+                return parsed
+            except Exception as e:
+                _LLM_LOGGER.error(f"OpenAI variant {i} failed: {e}")
+                return None
+        
+        max_workers = min(runs_per_model, _OPENAI_CONCURRENCY)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(_task, i) for i in range(runs_per_model)]
+            for fut in as_completed(futures):
+                res = fut.result()
+                if res is not None:
+                    results.append(res)
+        return results
+    
+    def run_anthropic_variants() -> List[Dict[str, Any]]:
+        """Run Anthropic model with variants."""
+        results = []
+        def _task(i: int) -> Optional[Dict[str, Any]]:
+            try:
+                p = build_prompt_variant(i, question, expected, sanitized_answer)
+                c = _call_anthropic_chat(p, anthropic_model)
+                parsed = parse_response(c)
+                parsed["model"] = anthropic_model
+                parsed["variant_id"] = i
+                return parsed
+            except Exception as e:
+                _LLM_LOGGER.error(f"Anthropic variant {i} failed: {e}")
+                return None
+        
+        max_workers = min(runs_per_model, _ANTHROPIC_CONCURRENCY)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(_task, i) for i in range(runs_per_model)]
+            for fut in as_completed(futures):
+                res = fut.result()
+                if res is not None:
+                    results.append(res)
+        return results
+    
+    # Run both models in parallel
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        openai_future = pool.submit(run_openai_variants)
+        anthropic_future = pool.submit(run_anthropic_variants)
+        openai_results = openai_future.result()
+        anthropic_results = anthropic_future.result()
+    
+    # Combine all results
+    all_results = openai_results + anthropic_results
+    
+    if not all_results:
+        raise RuntimeError("All dual-model evaluations failed")
+    
+    # Collect all scores
+    comp = [float(r.get("completeness", 0)) for r in all_results]
+    conc = [float(r.get("conciseness", 0)) for r in all_results]
+    corr = [float(r.get("correctness", 0)) for r in all_results]
+    
+    # Calculate median scores across all variants from both models
+    m_comp = float(median(comp))
+    m_conc = float(median(conc))
+    m_corr = float(median(corr))
+    
+    # Choose comment from the result closest to median
+    def dist(i: int) -> float:
+        ri = all_results[i]
+        return abs(float(ri.get("completeness", 0)) - m_comp) \
+             + abs(float(ri.get("conciseness", 0)) - m_conc) \
+             + abs(float(ri.get("correctness", 0)) - m_corr)
+    best_idx = min(range(len(all_results)), key=dist)
+    chosen_comment = all_results[best_idx].get("comment", "")
+    
+    # Check for inconsistency
+    comp_range = max(comp) - min(comp) if comp else 0
+    conc_range = max(conc) - min(conc) if conc else 0
+    corr_range = max(corr) - min(corr) if corr else 0
+    
+    agg = {
+        "completeness": m_comp,
+        "conciseness": m_conc,
+        "correctness": m_corr,
+        "comment": chosen_comment,
+        "inconsistent": (
+            comp_range > _INCONSISTENCY_RANGE
+            or conc_range > _INCONSISTENCY_RANGE
+            or corr_range > _INCONSISTENCY_RANGE
+        ),
+        "variant_scores": [
+            {
+                "completeness": float(r.get("completeness", 0)),
+                "conciseness": float(r.get("conciseness", 0)),
+                "correctness": float(r.get("correctness", 0)),
+                "model": r.get("model", "unknown"),
+            }
+            for r in all_results
+        ],
+        "variant_comments": [str(r.get("comment", "")) for r in all_results],
+        "models_used": [openai_model, anthropic_model],
+    }
+    
+    # Flag suspicious scores
+    if detect_suspicious_scores(agg, answer):
+        agg["needs_manual_review"] = True
+        _LLM_LOGGER.warning("Suspicious scores detected (dual-model) for answer: %s", answer[:100])
+    
+    return agg
+
+
 def weighted_score(evaluation: Dict[str, float], weights: Tuple[float, float, float]) -> float:
     """Compute a weighted score from the individual criteria.
 
@@ -419,8 +615,14 @@ def evaluate_submission(
     workers: int = 1,
     weights: Optional[Tuple[float, float, float]] = None,
     sc_runs: int = 1,
+    dual_model: bool = False,
 ) -> Dict[str, Any]:
-    """Evaluate all answers from a single participant submission."""
+    """Evaluate all answers from a single participant submission.
+    
+    Args:
+        dual_model: If True, uses both OpenAI and Anthropic models with self-consistency.
+                   Each model runs 2 variants (4 total scores), final score is median.
+    """
     participant_id = submission.get("participant_id") or "unknown"
     answers_list = list(submission.get("answers", []))
     effective_weights = weights if weights is not None else load_weights_from_env()
@@ -434,7 +636,15 @@ def evaluate_submission(
         q_text = q_info["question"]
         expected = q_info["expected_answer"]
         if use_llm:
-            if sc_runs and sc_runs > 1:
+            if dual_model:
+                # Dual-model mode: 2 variants per model = 4 total scores
+                evaluation = llm_evaluate_dual_model(
+                    q_text, expected, ans_text,
+                    openai_model=MODEL_NAME,
+                    anthropic_model=ANTHROPIC_MODEL,
+                    runs_per_model=2
+                )
+            elif sc_runs and sc_runs > 1:
                 evaluation = llm_evaluate_self_consistent(q_text, expected, ans_text, model=model, runs=sc_runs)
             else:
                 evaluation = llm_evaluate(q_text, expected, ans_text, model=model)

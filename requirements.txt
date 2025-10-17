@@ -1,6 +1,7 @@
 # External dependencies for Ecoflex Evaluation Pipeline
 # Pin to <1.0 because evaluate.py uses the legacy openai.ChatCompletion API
 openai>=0.27.10,<1.0
+anthropic>=0.39.0
 fastapi>=0.110,<1.0
 uvicorn[standard]>=0.23,<1.0
 openpyxl>=3.1,<4.0

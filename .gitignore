@@ -50,3 +50,6 @@ testing/OLLAMA_SETUP.md
 testing/MULTI_PROVIDER_TESTING.md
 testing/MODEL_TESTING.md
 testing/change_model.sh
+DUAL_MODEL_SETUP.md
+DEPLOYMENT_CHECKLIST.md
+COMMIT_MESSAGE.txt

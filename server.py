@@ -389,10 +389,10 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
 
     # Write a header block legend at the top
     ws.append(["Qid", "submitted answer", "correct answers", "final score", "inconsistent", "suspicious",
-               "variant correctness", "variant conciseness", "variant completeness", "variant score", "variant comment"]) 
-    for col in range(1, 12):
+               "variant model", "variant correctness", "variant conciseness", "variant completeness", "variant score", "variant comment"]) 
+    for col in range(1, 13):
         try:
-            ws.column_dimensions[chr(64 + col)].width = 24 if col in (2,3,11) else 18
+            ws.column_dimensions[chr(64 + col)].width = 24 if col in (2,3,12) else 18
         except Exception:
             pass
 
@@ -414,7 +414,7 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
             expected_text = ""
         # Write the question summary row
         suspicious = bool(eval_data.get("needs_manual_review", False))
-        ws.append([qid, submitted, expected_text, final_score, inconsistent, suspicious, None, None, None, None, None])
+        ws.append([qid, submitted, expected_text, final_score, inconsistent, suspicious, None, None, None, None, None, None])
         if inconsistent:
             ws.cell(row=ws.max_row, column=1).fill = red_fill
         if suspicious:
@@ -431,9 +431,10 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
                 v = v_scores[i]
                 comment = v_comments[i] if i < len(v_comments) else ""
                 w = v_weighted[i] if i < len(v_weighted) else None
-                ws.append([None, None, None, None, None, None, v.get("correctness"), v.get("conciseness"), v.get("completeness"), w, comment])
+                model_name = v.get("model", "unknown")
+                ws.append([None, None, None, None, None, None, model_name, v.get("correctness"), v.get("conciseness"), v.get("completeness"), w, comment])
             else:
-                ws.append([None]*11)
+                ws.append([None]*12)
     # Column widths already set in header block above; no further header-based sizing here
     os.makedirs(results_dir, exist_ok=True)
     xlsx_path = os.path.abspath(os.path.join(results_dir, f"{participant_id}.xlsx"))
@@ -488,6 +489,7 @@ async def grade_submission(
             FIXED_WORKERS,
             None,
             int(os.getenv("SELF_CONSISTENCY_RUNS", "3")),
+            True,  # dual_model=True
         )
     except HTTPException:
         raise
@@ -591,6 +593,7 @@ async def grade_batch(
                 FIXED_WORKERS,
                 None,
                 int(os.getenv("SELF_CONSISTENCY_RUNS", "3")),
+                True,  # dual_model=True
             )
             results.append(result)
         except Exception as exc:
