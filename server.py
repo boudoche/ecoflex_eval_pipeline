@@ -380,9 +380,9 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
     wb = Workbook()
     ws = wb.active
     ws.title = "Results"
-    # Layout: for each question, reserve 4 rows
+    # Layout: for each question, reserve 8 rows (4 variants per model × 2 models)
     # First columns per question on the first row: Qid, submitted answer, correct answers, final score, inconsistent
-    # Next 4 rows (one per variant): correctness, conciseness, completeness, score, comment
+    # Next 8 rows (one per variant): correctness, conciseness, completeness, score, comment
     from openpyxl.styles import PatternFill
     red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
@@ -424,8 +424,8 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
         v_scores = eval_data.get("variant_scores", []) or []
         v_comments = eval_data.get("variant_comments", []) or []
         v_weighted = eval_data.get("variant_weighted", []) or []
-        # Ensure 4 rows
-        max_rows = 4
+        # Ensure 8 rows (4 variants per model × 2 models)
+        max_rows = 8
         for i in range(max_rows):
             if i < len(v_scores):
                 v = v_scores[i]

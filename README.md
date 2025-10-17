@@ -220,10 +220,10 @@ A lightweight token‑based heuristic computes all three scores without calling 
 The server uses **dual-model evaluation** to increase scoring reliability:
 
 - **Two models run in parallel**: OpenAI GPT-4o-mini + Anthropic Claude 4.5 Haiku (Oct 2025)
-- **2 variants per model** = 4 total scores per answer (self-consistency)
-- **Median aggregation** across all 4 scores for the final result
+- **4 variants per model** = 8 total scores per answer (self-consistency)
+- **Median aggregation** across all 8 scores for the final result
 - **Parallel API calls** with rate limiting to maximize speed while respecting API limits
-- **XLSX output** includes a "variant model" column showing which model generated each score
+- **XLSX output** includes a "variant model" column showing which model generated each score (8 rows per question)
 
 To enable dual-model mode, both API keys must be set:
 ```bash
