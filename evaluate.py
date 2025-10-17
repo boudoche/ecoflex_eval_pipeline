@@ -642,7 +642,7 @@ def evaluate_submission(
                     q_text, expected, ans_text,
                     openai_model=MODEL_NAME,
                     anthropic_model=ANTHROPIC_MODEL,
-                    runs_per_model=2
+                    runs_per_model=4
                 )
             elif sc_runs and sc_runs > 1:
                 evaluation = llm_evaluate_self_consistent(q_text, expected, ans_text, model=model, runs=sc_runs)
