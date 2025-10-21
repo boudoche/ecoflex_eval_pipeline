@@ -46,7 +46,8 @@ except ImportError:
 
 DEFAULT_WEIGHTS: Tuple[float, float, float] = (0.3, 0.2, 0.5)
 MODEL_NAME = "gpt-4o-mini"
-ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
+# Anthropic model can be overridden via ANTHROPIC_MODEL env variable
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 # Global OpenAI concurrency limiter (per-process)
 _OPENAI_CONCURRENCY = max(1, int(os.getenv("OPENAI_CONCURRENCY", "6")))

@@ -231,9 +231,10 @@ export OPENAI_API_KEY=sk-...
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Rate limits (configurable via env):
-- `OPENAI_CONCURRENCY=6` (default, for ~6 RPM)
-- `ANTHROPIC_CONCURRENCY=3` (default, for ~50 RPM with conservative limit)
+Configurable via environment variables:
+- `ANTHROPIC_MODEL` - Anthropic model to use (default: `claude-haiku-4-5-20251001`)
+- `OPENAI_CONCURRENCY` - OpenAI concurrent requests (default: 6, for ~6 RPM)
+- `ANTHROPIC_CONCURRENCY` - Anthropic concurrent requests (default: 3, for ~50 RPM)
 
 ### Parallelization
 
