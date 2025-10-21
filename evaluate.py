@@ -425,6 +425,20 @@ def llm_evaluate_self_consistent(
     m_comp = float(median(comp))
     m_conc = float(median(conc))
     m_corr = float(median(corr))
+    
+    # Calculate weighted scores for each variant to check for inconsistency
+    weights = load_weights_from_env()
+    c_w, z_w, r_w = weights
+    variant_weighted_scores = [
+        c_w * float(r.get("completeness", 0)) + 
+        z_w * float(r.get("conciseness", 0)) + 
+        r_w * float(r.get("correctness", 0))
+        for r in results
+    ]
+    
+    # Check for inconsistency based on final weighted scores
+    weighted_range = max(variant_weighted_scores) - min(variant_weighted_scores) if variant_weighted_scores else 0
+    
     # Choose the comment from the run whose scores are closest to the medians
     def dist(i: int) -> float:
         ri = results[i]
@@ -438,11 +452,7 @@ def llm_evaluate_self_consistent(
         "conciseness": m_conc,
         "correctness": m_corr,
         "comment": chosen_comment,
-        "inconsistent": (
-            (max(comp) - min(comp) > _INCONSISTENCY_RANGE)
-            or (max(conc) - min(conc) > _INCONSISTENCY_RANGE)
-            or (max(corr) - min(corr) > _INCONSISTENCY_RANGE)
-        ),
+        "inconsistent": weighted_range > _INCONSISTENCY_RANGE,
         "variant_scores": [
             {"completeness": float(r.get("completeness", 0)), "conciseness": float(r.get("conciseness", 0)), "correctness": float(r.get("correctness", 0))}
             for r in results
@@ -550,6 +560,19 @@ def llm_evaluate_dual_model(
     m_conc = float(median(conc))
     m_corr = float(median(corr))
     
+    # Calculate weighted scores for each variant to check for inconsistency
+    weights = load_weights_from_env()
+    c_w, z_w, r_w = weights
+    variant_weighted_scores = [
+        c_w * float(r.get("completeness", 0)) + 
+        z_w * float(r.get("conciseness", 0)) + 
+        r_w * float(r.get("correctness", 0))
+        for r in all_results
+    ]
+    
+    # Check for inconsistency based on final weighted scores
+    weighted_range = max(variant_weighted_scores) - min(variant_weighted_scores) if variant_weighted_scores else 0
+    
     # Choose comment from the result closest to median
     def dist(i: int) -> float:
         ri = all_results[i]
@@ -559,21 +582,12 @@ def llm_evaluate_dual_model(
     best_idx = min(range(len(all_results)), key=dist)
     chosen_comment = all_results[best_idx].get("comment", "")
     
-    # Check for inconsistency
-    comp_range = max(comp) - min(comp) if comp else 0
-    conc_range = max(conc) - min(conc) if conc else 0
-    corr_range = max(corr) - min(corr) if corr else 0
-    
     agg = {
         "completeness": m_comp,
         "conciseness": m_conc,
         "correctness": m_corr,
         "comment": chosen_comment,
-        "inconsistent": (
-            comp_range > _INCONSISTENCY_RANGE
-            or conc_range > _INCONSISTENCY_RANGE
-            or corr_range > _INCONSISTENCY_RANGE
-        ),
+        "inconsistent": weighted_range > _INCONSISTENCY_RANGE,
         "variant_scores": [
             {
                 "completeness": float(r.get("completeness", 0)),
