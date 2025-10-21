@@ -396,6 +396,9 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
         except Exception:
             pass
 
+    # Collect all final scores for summary calculation
+    all_final_scores = []
+
     for q in questions:
         qid = q.get("question_id")
         submitted = q.get("submitted_answer", "")
@@ -419,6 +422,10 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
             ws.cell(row=ws.max_row, column=1).fill = red_fill
         if suspicious:
             ws.cell(row=ws.max_row, column=1).fill = yellow_fill
+        
+        # Collect final score for summary
+        if final_score is not None:
+            all_final_scores.append(float(final_score))
 
         # Variants
         v_scores = eval_data.get("variant_scores", []) or []
@@ -435,6 +442,40 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
                 ws.append([None, None, None, None, None, None, model_name, v.get("correctness"), v.get("conciseness"), v.get("completeness"), w, comment])
             else:
                 ws.append([None]*12)
+    
+    # Add summary section at the end
+    if all_final_scores:
+        # Add empty row for separation
+        ws.append([None]*12)
+        
+        # Calculate statistics
+        total_score = sum(all_final_scores)
+        average_score = total_score / len(all_final_scores)
+        
+        # Add summary rows with bold styling
+        from openpyxl.styles import Font
+        bold_font = Font(bold=True, size=12)
+        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        
+        # Total sum row
+        ws.append(["TOTAL SCORE", None, None, round(total_score, 2), None, None, None, None, None, None, None, None])
+        ws.cell(row=ws.max_row, column=1).font = bold_font
+        ws.cell(row=ws.max_row, column=1).fill = green_fill
+        ws.cell(row=ws.max_row, column=4).font = bold_font
+        ws.cell(row=ws.max_row, column=4).fill = green_fill
+        
+        # Average score row
+        ws.append(["AVERAGE SCORE", None, None, round(average_score, 2), None, None, None, None, None, None, None, None])
+        ws.cell(row=ws.max_row, column=1).font = bold_font
+        ws.cell(row=ws.max_row, column=1).fill = green_fill
+        ws.cell(row=ws.max_row, column=4).font = bold_font
+        ws.cell(row=ws.max_row, column=4).fill = green_fill
+        
+        # Number of questions
+        ws.append(["NUMBER OF QUESTIONS", None, None, len(all_final_scores), None, None, None, None, None, None, None, None])
+        ws.cell(row=ws.max_row, column=1).font = bold_font
+        ws.cell(row=ws.max_row, column=4).font = bold_font
+    
     # Column widths already set in header block above; no further header-based sizing here
     os.makedirs(results_dir, exist_ok=True)
     xlsx_path = os.path.abspath(os.path.join(results_dir, f"{participant_id}.xlsx"))
