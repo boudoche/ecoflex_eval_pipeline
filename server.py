@@ -396,8 +396,8 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
         except Exception:
             pass
 
-    # Collect all final scores for summary calculation
-    all_final_scores = []
+    # Track rows containing final scores for formula generation
+    score_rows = []
 
     for q in questions:
         qid = q.get("question_id")
@@ -423,9 +423,9 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
         if suspicious:
             ws.cell(row=ws.max_row, column=1).fill = yellow_fill
         
-        # Collect final score for summary
+        # Track the row number for formula (column D = final score)
         if final_score is not None:
-            all_final_scores.append(float(final_score))
+            score_rows.append(ws.max_row)
 
         # Variants
         v_scores = eval_data.get("variant_scores", []) or []
@@ -443,38 +443,47 @@ def _write_team_xlsx(results_dir: str, participant_id: str, questions: List[Dict
             else:
                 ws.append([None]*12)
     
-    # Add summary section at the end
-    if all_final_scores:
+    # Add summary section at the end with Excel formulas
+    if score_rows:
         # Add empty row for separation
         ws.append([None]*12)
-        
-        # Calculate statistics
-        total_score = sum(all_final_scores)
-        average_score = total_score / len(all_final_scores)
         
         # Add summary rows with bold styling
         from openpyxl.styles import Font
         bold_font = Font(bold=True, size=12)
         green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
         
-        # Total sum row
-        ws.append(["TOTAL SCORE", None, None, round(total_score, 2), None, None, None, None, None, None, None, None])
-        ws.cell(row=ws.max_row, column=1).font = bold_font
-        ws.cell(row=ws.max_row, column=1).fill = green_fill
-        ws.cell(row=ws.max_row, column=4).font = bold_font
-        ws.cell(row=ws.max_row, column=4).fill = green_fill
+        # Build Excel formula ranges for SUM and AVERAGE
+        # Column D contains the final scores
+        score_cells = [f"D{row}" for row in score_rows]
+        sum_formula = f"=SUM({','.join(score_cells)})"
+        avg_formula = f"=AVERAGE({','.join(score_cells)})"
+        count_formula = f"=COUNTA({','.join(score_cells)})"
         
-        # Average score row
-        ws.append(["AVERAGE SCORE", None, None, round(average_score, 2), None, None, None, None, None, None, None, None])
-        ws.cell(row=ws.max_row, column=1).font = bold_font
-        ws.cell(row=ws.max_row, column=1).fill = green_fill
-        ws.cell(row=ws.max_row, column=4).font = bold_font
-        ws.cell(row=ws.max_row, column=4).fill = green_fill
+        # Total sum row with formula
+        ws.append(["TOTAL SCORE", None, None, None, None, None, None, None, None, None, None, None])
+        total_row = ws.max_row
+        ws.cell(row=total_row, column=4).value = sum_formula
+        ws.cell(row=total_row, column=1).font = bold_font
+        ws.cell(row=total_row, column=1).fill = green_fill
+        ws.cell(row=total_row, column=4).font = bold_font
+        ws.cell(row=total_row, column=4).fill = green_fill
         
-        # Number of questions
-        ws.append(["NUMBER OF QUESTIONS", None, None, len(all_final_scores), None, None, None, None, None, None, None, None])
-        ws.cell(row=ws.max_row, column=1).font = bold_font
-        ws.cell(row=ws.max_row, column=4).font = bold_font
+        # Average score row with formula
+        ws.append(["AVERAGE SCORE", None, None, None, None, None, None, None, None, None, None, None])
+        avg_row = ws.max_row
+        ws.cell(row=avg_row, column=4).value = avg_formula
+        ws.cell(row=avg_row, column=1).font = bold_font
+        ws.cell(row=avg_row, column=1).fill = green_fill
+        ws.cell(row=avg_row, column=4).font = bold_font
+        ws.cell(row=avg_row, column=4).fill = green_fill
+        
+        # Number of questions with formula
+        ws.append(["NUMBER OF QUESTIONS", None, None, None, None, None, None, None, None, None, None, None])
+        count_row = ws.max_row
+        ws.cell(row=count_row, column=4).value = count_formula
+        ws.cell(row=count_row, column=1).font = bold_font
+        ws.cell(row=count_row, column=4).font = bold_font
     
     # Column widths already set in header block above; no further header-based sizing here
     os.makedirs(results_dir, exist_ok=True)
