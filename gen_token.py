@@ -132,7 +132,7 @@ Best regards,
 Argusa Data Challenge Team
 """
     
-    # HTML version (Outlook-compatible using tables and inline styles)
+    # HTML version (Outlook-compatible using tables and inline styles with Argusa branding)
     html_body = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -145,27 +145,41 @@ Argusa Data Challenge Team
         <tr>
             <td style="padding: 20px 0;">
                 <!-- Content wrapper -->
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 10px;" align="center">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff;" align="center">
                     
-                    <!-- Header with solid color (Outlook doesn't support gradients well) -->
+                    <!-- Header with Argusa brand color -->
                     <tr>
-                        <td style="background-color: #667eea; padding: 30px; text-align: center; color: #ffffff; border-radius: 10px 10px 0 0;">
-                            <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold; color: #ffffff;">🎯 Your Submission Token</h1>
+                        <td style="background-color: #004B87; padding: 30px 20px; text-align: center; color: #ffffff;">
+                            <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; color: #ffffff;">🎯 Your Submission Token</h1>
                             <p style="margin: 0; font-size: 16px; color: #ffffff;">Argusa Data Challenge</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Brand color bar (Argusa colors: Blue, Yellow, Black, Orange) -->
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td width="25%" style="background-color: #004B87; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #FDB913; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #000000; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #E94E1B; height: 8px;"></td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     
                     <!-- Content section -->
                     <tr>
-                        <td style="padding: 30px; background-color: #f9f9f9;">
+                        <td style="padding: 30px 20px; background-color: #f9f9f9; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
                             <p style="margin: 0 0 15px 0; font-size: 16px; color: #333333; line-height: 1.6;">Hello <strong>{team}</strong>,</p>
                             <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333; line-height: 1.6;">Your submission token has been generated for the Argusa Data Challenge.</p>
                             
                             <!-- Token box -->
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
                                 <tr>
-                                    <td style="background-color: #ffffff; border: 2px solid #667eea; padding: 20px; text-align: center; border-radius: 5px;">
-                                        <p style="margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 18px; font-weight: bold; color: #667eea; word-break: break-all;">{token}</p>
+                                    <td style="background-color: #ffffff; border: 2px solid #004B87; padding: 20px; text-align: center; border-radius: 3px;">
+                                        <p style="margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 18px; font-weight: bold; color: #004B87; word-break: break-all;">{token}</p>
                                     </td>
                                 </tr>
                             </table>
@@ -173,7 +187,7 @@ Argusa Data Challenge Team
                             <!-- Warning box -->
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
                                 <tr>
-                                    <td style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px;">
+                                    <td style="background-color: #fff3cd; border-left: 5px solid #FDB913; padding: 15px;">
                                         <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: bold; color: #856404;">⚠️ IMPORTANT INFORMATION</p>
                                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                             <tr>
@@ -193,15 +207,24 @@ Argusa Data Challenge Team
                             <p style="margin: 20px 0 15px 0; font-size: 16px; color: #333333; line-height: 1.6;">Please use this token carefully when submitting your answers.</p>
                             <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333; line-height: 1.6;">If you have any questions or encounter issues, please contact the organizers.</p>
                             
-                            <!-- Footer -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px;">
+                            <p style="margin: 20px 0 0 0; font-size: 16px; color: #333333; line-height: 1.6;">Best regards,<br>
+                            <strong>Argusa Data Challenge Team</strong></p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f5f5f5; padding: 20px; text-align: center; border-left: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd;">
+                            <!-- Brand color bar -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 10px;">
                                 <tr>
-                                    <td style="text-align: center; padding: 20px 0; border-top: 1px solid #dddddd;">
-                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #666666;">Best regards,</p>
-                                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #667eea;">Argusa Data Challenge Team</p>
-                                    </td>
+                                    <td width="25%" style="background-color: #004B87; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #FDB913; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #000000; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #E94E1B; height: 8px;"></td>
                                 </tr>
                             </table>
+                            <p style="margin: 0; font-size: 12px; color: #666666; line-height: 1.6;">This is an automated message. Please do not reply to this email.</p>
                         </td>
                     </tr>
                 </table>
