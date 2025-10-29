@@ -8,8 +8,38 @@ import ssl
 import sys
 import tempfile
 from email.message import EmailMessage
+from pathlib import Path
 from secrets import token_urlsafe
 from typing import Dict, Any
+
+
+def load_env_file(env_path: str = "/etc/ecoflex.env") -> None:
+    """Load environment variables from a file (like systemd EnvironmentFile)."""
+    if not os.path.isfile(env_path):
+        return
+    
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                # Skip empty lines and comments
+                if not line or line.startswith("#"):
+                    continue
+                # Parse KEY=VALUE
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    # Remove quotes if present
+                    if value.startswith('"') and value.endswith('"'):
+                        value = value[1:-1]
+                    elif value.startswith("'") and value.endswith("'"):
+                        value = value[1:-1]
+                    # Only set if not already in environment
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+    except Exception as e:
+        print(f"Warning: Could not load {env_path}: {e}", file=sys.stderr)
 
 
 def load_tokens(path: str) -> Dict[str, Any]:
@@ -187,6 +217,9 @@ Argusa Data Challenge Team
 
 
 def main() -> None:
+    # Load environment variables from config file (if it exists)
+    load_env_file("/etc/ecoflex.env")
+    
     parser = argparse.ArgumentParser(description="Generate or rotate a submission token for a team (with optional email)")
     parser.add_argument("--team", required=True, help="Team name (participant_id)")
     parser.add_argument("--email", default="", help="Email address to attach to the token")
@@ -194,7 +227,12 @@ def main() -> None:
     parser.add_argument("--length", type=int, default=24, help="Token length parameter for token_urlsafe (default 24)")
     parser.add_argument("--rotate", action="store_true", help="Rotate token even if the team already has one")
     parser.add_argument("--no-email", action="store_true", help="Skip sending email notification")
+    parser.add_argument("--env-file", default="/etc/ecoflex.env", help="Path to environment file (default: /etc/ecoflex.env)")
     args = parser.parse_args()
+    
+    # Allow loading custom env file via argument
+    if args.env_file != "/etc/ecoflex.env":
+        load_env_file(args.env_file)
 
     tokens_path = args.tokens_path
     mapping = load_tokens(tokens_path)
