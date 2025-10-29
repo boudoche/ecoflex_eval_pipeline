@@ -400,28 +400,36 @@
       message.className = 'msg ok';
       
       try {
-        const params = new URLSearchParams({ use_llm: 'true', write_files: 'true' });
-        const res = await fetch(`/grade?${params.toString()}`, {
+        // Use new async /submit endpoint (no query params needed)
+        const res = await fetch('/submit', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Submission-Token': token,
+            'X-Team-Token': token,  // Changed from X-Submission-Token
           },
           body: JSON.stringify(bodyPayload),
         });
         
-        if (res.ok) {
+        // Accept both 200 (old sync) and 202 (new async) for compatibility
+        if (res.ok || res.status === 202) {
+          const data = await res.json();
+          
           // Success! Show animated success message
-          message.innerHTML = '<span class="success-icon">✅</span> <strong>Submission Complete!</strong><br><small>Your answers have been received and are being evaluated. You will receive a confirmation email shortly.</small>';
+          message.innerHTML = '<span class="success-icon">✅</span> <strong>Submission Accepted!</strong><br><small>Your submission has been received and is being processed. <strong>You will receive a confirmation email</strong> when the evaluation is complete (usually within 2-3 minutes).</small>';
           message.className = 'msg ok';
           
-          // Clear the form after 30 seconds
+          // Clear the form after a delay
           setTimeout(() => {
             clearFileSelection();
             tokenEl.value = '';
-          }, 2000000);
+            message.innerHTML = '';
+            message.className = 'msg hidden';
+          }, 10000); // 10 seconds
+          
         } else if (res.status === 401) {
           showMessage('❌ Invalid or missing token. Please check your submission token.', false);
+        } else if (res.status === 403) {
+          showMessage('❌ Token already used. Each token can only be used once. Please contact organizers if you need a new token.', false);
         } else if (res.status === 413) {
           let errText = '❌ Submission too large. Maximum size: 5.0MB';
           try {

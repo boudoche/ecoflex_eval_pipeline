@@ -64,3 +64,4 @@ LOAD_TESTING.md
 load_test.py
 generate_test_tokens.sh
 ASYNC_SUBMISSION.md
+FRONTEND_UPDATE.md
