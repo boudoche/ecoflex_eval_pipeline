@@ -419,7 +419,7 @@
           setTimeout(() => {
             clearFileSelection();
             tokenEl.value = '';
-          }, 30000);
+          }, 2000000);
         } else if (res.status === 401) {
           showMessage('❌ Invalid or missing token. Please check your submission token.', false);
         } else if (res.status === 413) {
