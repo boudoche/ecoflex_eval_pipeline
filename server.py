@@ -603,6 +603,206 @@ async def grade_submission(
     return result
 
 
+@app.post("/submit")
+async def submit_answers(
+    request: Request,
+    x_team_token: Optional[str] = Header(None, alias="X-Team-Token"),
+) -> Dict[str, Any]:
+    """
+    Accept submission and process asynchronously.
+    Returns 202 Accepted immediately, then processes in background.
+    """
+    # Check content length FIRST before any other processing
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_SUBMISSION_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Submission too large. Maximum size: {MAX_SUBMISSION_SIZE / (1024*1024):.1f}MB"
+        )
+
+    # Validate token and get team info
+    token, info = _require_token_and_team(x_team_token)
+    team = info.get("team", "unknown")
+    email = info.get("email", "")
+
+    # Load questions
+    questions = _state.get("questions") or {}
+    if not questions:
+        raise HTTPException(status_code=500, detail="Questions not loaded")
+
+    # Parse and validate submission format
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    try:
+        sub = _coerce_submission_shape(body)
+    except HTTPException:
+        raise
+    
+    # Quick validation of submission structure
+    sub = dict(sub)
+    sub["participant_id"] = team
+    
+    # Validate we have OpenAI API key if needed
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=400, detail="Missing OPENAI_API_KEY on server")
+
+    # Mark token as used IMMEDIATELY (before background processing)
+    # This prevents duplicate submissions while grading
+    info["used"] = True
+    _state["token_to_info"][token] = info
+    _persist_tokens(_state["token_to_info"])
+    
+    logger.info("Submission accepted for team=%s, starting background grading", team)
+    
+    # Launch background processing
+    asyncio.create_task(_process_submission_background(team, email, sub, questions, body))
+    
+    # Return 202 Accepted immediately
+    return {
+        "status": "accepted",
+        "message": f"Submission received for team {team}. Grading in progress. You will receive an email when complete.",
+        "participant_id": team,
+        "answers_count": len(sub.get("answers", []))
+    }
+
+
+async def _process_submission_background(
+    team: str,
+    email: str, 
+    submission: Dict[str, Any],
+    questions: Dict[str, Any],
+    original_body: Dict[str, Any]
+) -> None:
+    """
+    Process submission in background: grade, write files, send email.
+    This runs asynchronously after returning 202 to the client.
+    """
+    try:
+        logger.info("Background grading started for team=%s", team)
+        
+        # Run grading (CPU intensive, so use executor)
+        result = await _run_in_executor(
+            evaluate_submission,
+            questions,
+            submission,
+            True,  # use_llm
+            DEFAULT_MODEL,
+            FIXED_WORKERS,
+            None,
+            int(os.getenv("SELF_CONSISTENCY_RUNS", "3")),
+            True,  # dual_model=True
+        )
+        
+        logger.info("Background grading completed for team=%s", team)
+        
+        # Write results to disk
+        try:
+            await _run_in_executor(write_results, result, RESULTS_DIR)
+            
+            # Write CSV summary
+            csv_path = os.path.join(RESULTS_DIR, "summary.csv")
+            rows: List[Dict[str, Any]] = []
+            pid = result.get("participant_id") or "unknown"
+            for q in result.get("questions", []):
+                eval_data = q["evaluation"]
+                rows.append({
+                    "participant_id": pid,
+                    "question_id": q["question_id"],
+                    "completeness": eval_data["completeness"],
+                    "conciseness": eval_data["conciseness"],
+                    "correctness": eval_data["correctness"],
+                    "score": eval_data["score"],
+                })
+            await _run_in_executor(write_summary_csv, csv_path, rows)
+            
+            # Write XLSX per participant
+            await _run_in_executor(_write_team_xlsx, RESULTS_DIR, pid, result.get("questions", []))
+            
+            logger.info("Results written for team=%s", team)
+            
+        except Exception as exc:
+            logger.exception("Failed to write results for team=%s", team)
+        
+        # Send confirmation email (best-effort)
+        try:
+            if email:
+                _send_confirmation_email(email, team, original_body)
+                logger.info("Confirmation email sent to team=%s (%s)", team, email)
+            else:
+                logger.warning("No email address for team=%s, skipping confirmation", team)
+        except Exception as exc:
+            logger.exception("Failed to send confirmation email for team=%s", team)
+        
+        logger.info("Background processing completed successfully for team=%s", team)
+        
+    except Exception as exc:
+        logger.exception("Background processing failed for team=%s", team)
+        # Send error email if possible
+        try:
+            if email:
+                _send_error_email(email, team, str(exc))
+        except Exception:
+            logger.exception("Failed to send error email for team=%s", team)
+
+
+def _send_error_email(to_addr: str, participant_id: str, error_message: str) -> None:
+    """Send an email notification when grading fails."""
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_from = os.getenv("SMTP_FROM")
+    if not smtp_host or not smtp_from:
+        logger.debug("Email disabled: SMTP_HOST/SMTP_FROM not configured")
+        return
+    
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    use_ssl = (smtp_port == 465)
+    
+    msg = EmailMessage()
+    msg["Subject"] = f"Submission Error - {participant_id}"
+    msg["From"] = smtp_from
+    msg["To"] = to_addr
+    
+    text_body = f"""Hello {participant_id},
+
+Unfortunately, there was an error processing your submission.
+
+Error: {error_message}
+
+Please contact the competition organizers for assistance.
+
+Best regards,
+The Argusa Data Challenge Team
+"""
+    
+    msg.set_content(text_body)
+    
+    try:
+        if use_ssl:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=30) as s:
+                if smtp_user and smtp_password:
+                    s.login(smtp_user, smtp_password)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as s:
+                s.ehlo()
+                try:
+                    s.starttls(context=ssl.create_default_context())
+                    s.ehlo()
+                except Exception:
+                    pass
+                if smtp_user and smtp_password:
+                    s.login(smtp_user, smtp_password)
+                s.send_message(msg)
+        logger.info("Sent error email to %s", to_addr)
+    except Exception as exc:
+        logger.exception("Failed to send error email to %s: %s", to_addr, exc)
+
+
 @app.post("/grade-batch")
 async def grade_batch(
     request: Request,

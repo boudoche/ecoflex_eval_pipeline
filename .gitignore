@@ -55,3 +55,12 @@ DEPLOYMENT_CHECKLIST.md
 COMMIT_MESSAGE.txt
 submissions/Elisabetta1_submission.json
 .DS_Store
+test_async_submit.py
+SSH_TEST_QUICKSTART.md
+remote_test.sh
+.gitignore
+REMOTE_LOAD_TESTING.md
+LOAD_TESTING.md
+load_test.py
+generate_test_tokens.sh
+ASYNC_SUBMISSION.md
