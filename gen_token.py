@@ -132,59 +132,82 @@ Best regards,
 Argusa Data Challenge Team
 """
     
-    # HTML version (prettier)
+    # HTML version (Outlook-compatible using tables and inline styles)
     html_body = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-        .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-        .token-box {{ background: #fff; border: 2px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 5px; text-align: center; }}
-        .token {{ font-family: monospace; font-size: 18px; font-weight: bold; color: #667eea; word-break: break-all; }}
-        .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }}
-        .warning-title {{ color: #856404; font-weight: bold; margin-bottom: 10px; }}
-        ul {{ padding-left: 20px; }}
-        li {{ margin-bottom: 8px; }}
-        .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 14px; }}
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🎯 Your Submission Token</h1>
-            <p>Argusa Data Challenge</p>
-        </div>
-        <div class="content">
-            <p>Hello <strong>{team}</strong>,</p>
-            <p>Your submission token has been generated for the Argusa Data Challenge.</p>
-            
-            <div class="token-box">
-                <div class="token">{token}</div>
-            </div>
-            
-            <div class="warning">
-                <div class="warning-title">⚠️ IMPORTANT INFORMATION</div>
-                <ul>
-                    <li><strong>This token is FOR ONE-TIME USE ONLY</strong></li>
-                    <li>You can submit your answers using this token</li>
-                    <li>After submission, the token will be marked as used</li>
-                    <li><strong>NO additional tokens will be provided except in very special cases</strong></li>
-                    <li>Keep this token secure and do not share it</li>
-                </ul>
-            </div>
-            
-            <p>Please use this token carefully when submitting your answers.</p>
-            <p>If you have any questions or encounter issues, please contact the organizers.</p>
-            
-            <div class="footer">
-                <p>Best regards,<br>
-                <strong>Argusa Data Challenge Team</strong></p>
-            </div>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <!-- Main container table -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td style="padding: 20px 0;">
+                <!-- Content wrapper -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 10px;" align="center">
+                    
+                    <!-- Header with solid color (Outlook doesn't support gradients well) -->
+                    <tr>
+                        <td style="background-color: #667eea; padding: 30px; text-align: center; color: #ffffff; border-radius: 10px 10px 0 0;">
+                            <h1 style="margin: 0 0 10px 0; font-size: 28px; font-weight: bold; color: #ffffff;">🎯 Your Submission Token</h1>
+                            <p style="margin: 0; font-size: 16px; color: #ffffff;">Argusa Data Challenge</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content section -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f9f9f9;">
+                            <p style="margin: 0 0 15px 0; font-size: 16px; color: #333333; line-height: 1.6;">Hello <strong>{team}</strong>,</p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333; line-height: 1.6;">Your submission token has been generated for the Argusa Data Challenge.</p>
+                            
+                            <!-- Token box -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+                                <tr>
+                                    <td style="background-color: #ffffff; border: 2px solid #667eea; padding: 20px; text-align: center; border-radius: 5px;">
+                                        <p style="margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 18px; font-weight: bold; color: #667eea; word-break: break-all;">{token}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Warning box -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+                                <tr>
+                                    <td style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px;">
+                                        <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: bold; color: #856404;">⚠️ IMPORTANT INFORMATION</p>
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="padding: 0;">
+                                                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #333333; line-height: 1.6;">• <strong>This token is FOR ONE-TIME USE ONLY</strong></p>
+                                                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #333333; line-height: 1.6;">• You can submit your answers using this token</p>
+                                                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #333333; line-height: 1.6;">• After submission, the token will be marked as used</p>
+                                                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #333333; line-height: 1.6;">• <strong>NO additional tokens will be provided except in very special cases</strong></p>
+                                                    <p style="margin: 0; font-size: 14px; color: #333333; line-height: 1.6;">• Keep this token secure and do not share it</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 20px 0 15px 0; font-size: 16px; color: #333333; line-height: 1.6;">Please use this token carefully when submitting your answers.</p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333; line-height: 1.6;">If you have any questions or encounter issues, please contact the organizers.</p>
+                            
+                            <!-- Footer -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px;">
+                                <tr>
+                                    <td style="text-align: center; padding: 20px 0; border-top: 1px solid #dddddd;">
+                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #666666;">Best regards,</p>
+                                        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #667eea;">Argusa Data Challenge Team</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
 """

@@ -194,81 +194,99 @@ This is an automated message. Please do not reply to this email.
 <html>
 <head>
     <meta charset="utf-8">
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff; }}
-        .header {{ 
-            background: linear-gradient(135deg, #004B87 0%, #004B87 25%, #FDB913 25%, #FDB913 50%, #000000 50%, #000000 75%, #E94E1B 75%, #E94E1B 100%);
-            color: white; 
-            padding: 30px 20px; 
-            text-align: center; 
-            border-radius: 5px 5px 0 0;
-        }}
-        .logo {{ max-width: 200px; height: auto; margin-bottom: 15px; }}
-        .header h1 {{ margin: 0; font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }}
-        .content {{ background-color: #f9f9f9; padding: 30px 20px; border: 1px solid #ddd; }}
-        .details {{ 
-            background-color: white; 
-            padding: 20px; 
-            margin: 20px 0; 
-            border-left: 5px solid #004B87;
-            border-radius: 3px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        .details h3 {{ color: #004B87; margin-top: 0; }}
-        .details ul {{ list-style: none; padding: 0; }}
-        .details li {{ padding: 8px 0; border-bottom: 1px solid #f0f0f0; }}
-        .details li:last-child {{ border-bottom: none; }}
-        .footer {{ 
-            text-align: center; 
-            margin-top: 20px; 
-            padding: 20px;
-            font-size: 12px; 
-            color: #666;
-            background-color: #f5f5f5;
-            border-radius: 0 0 5px 5px;
-        }}
-        .success {{ color: #004B87; font-weight: bold; font-size: 18px; }}
-        .brand-bar {{
-            height: 8px;
-            background: linear-gradient(90deg, #004B87 0%, #004B87 25%, #FDB913 25%, #FDB913 50%, #000000 50%, #000000 75%, #E94E1B 75%, #E94E1B 100%);
-            margin-bottom: 20px;
-        }}
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            {"<img src='" + logo_url + "' alt='Argusa Logo' class='logo' />" if logo_url else ""}
-            <h1>✓ Submission Received</h1>
-        </div>
-        <div class="brand-bar"></div>
-        <div class="content">
-            <p>Hello <strong>{participant_id}</strong>,</p>
-            
-            <p class="success">Your submission has been received successfully!</p>
-            
-            <div class="details">
-                <h3>Submission Details</h3>
-                <ul>
-                    <li><strong>Team/Participant:</strong> {participant_id}</li>
-                    <li><strong>Number of answers:</strong> {len(submission_json.get('answers', []))}</li>
-                    <li><strong>Status:</strong> Received</li>
-                </ul>
-            </div>
-            
-            <p>Your submission file is attached to this email for your records.</p>
-            
-            <p>We will notify you once the evaluation is complete.</p>
-            
-            <p>Best regards,<br>
-            <strong>The Argusa Data Challenge Team</strong></p>
-        </div>
-        <div class="footer">
-            <div class="brand-bar" style="margin-bottom: 10px;"></div>
-            <p>This is an automated message. Please do not reply to this email.</p>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <!-- Main container table -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td style="padding: 20px 0;">
+                <!-- Content wrapper -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff;" align="center">
+                    
+                    <!-- Header with Argusa brand color -->
+                    <tr>
+                        <td style="background-color: #004B87; padding: 30px 20px; text-align: center; color: #ffffff;">
+                            {"<img src='" + logo_url + "' alt='Argusa Logo' style='max-width: 200px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;' />" if logo_url else ""}
+                            <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #ffffff;">✓ Submission Received</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Brand color bar (Argusa colors: Blue, Yellow, Black, Orange) -->
+                    <tr>
+                        <td style="padding: 0;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td width="25%" style="background-color: #004B87; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #FDB913; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #000000; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #E94E1B; height: 8px;"></td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content section -->
+                    <tr>
+                        <td style="padding: 30px 20px; background-color: #f9f9f9; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
+                            <p style="margin: 0 0 15px 0; font-size: 16px; color: #333333; line-height: 1.6;">Hello <strong>{participant_id}</strong>,</p>
+                            
+                            <p style="margin: 0 0 20px 0; font-size: 18px; font-weight: bold; color: #004B87; line-height: 1.6;">Your submission has been received successfully!</p>
+                            
+                            <!-- Details box -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+                                <tr>
+                                    <td style="background-color: #ffffff; border-left: 5px solid #004B87; padding: 20px; border-radius: 3px;">
+                                        <h3 style="margin: 0 0 15px 0; font-size: 18px; color: #004B87;">Submission Details</h3>
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                                                    <p style="margin: 0; font-size: 14px; color: #333333; line-height: 1.6;"><strong>Team/Participant:</strong> {participant_id}</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #f0f0f0;">
+                                                    <p style="margin: 0; font-size: 14px; color: #333333; line-height: 1.6;"><strong>Number of answers:</strong> {len(submission_json.get('answers', []))}</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <p style="margin: 0; font-size: 14px; color: #333333; line-height: 1.6;"><strong>Status:</strong> Received</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="margin: 20px 0 15px 0; font-size: 16px; color: #333333; line-height: 1.6;">Your submission file is attached to this email for your records.</p>
+                            
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333; line-height: 1.6;">We will notify you once the evaluation is complete.</p>
+                            
+                            <p style="margin: 20px 0 0 0; font-size: 16px; color: #333333; line-height: 1.6;">Best regards,<br>
+                            <strong>The Argusa Data Challenge Team</strong></p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f5f5f5; padding: 20px; text-align: center; border-left: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd;">
+                            <!-- Brand color bar -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 10px;">
+                                <tr>
+                                    <td width="25%" style="background-color: #004B87; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #FDB913; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #000000; height: 8px;"></td>
+                                    <td width="25%" style="background-color: #E94E1B; height: 8px;"></td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0; font-size: 12px; color: #666666; line-height: 1.6;">This is an automated message. Please do not reply to this email.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
 """
