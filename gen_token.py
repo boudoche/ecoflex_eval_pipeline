@@ -75,10 +75,21 @@ def write_tokens_atomic(path: str, data: Dict[str, Any]) -> None:
             pass
 
 
-def send_token_email(team: str, email: str, token: str) -> None:
-    """Send email notification with the submission token."""
-    if not email:
+def send_token_email(team: str, emails: list, token: str) -> None:
+    """Send email notification with the submission token to multiple recipients."""
+    if not emails:
         print("No email provided, skipping email notification", file=sys.stderr)
+        return
+    
+    # Convert single email to list for compatibility
+    if isinstance(emails, str):
+        emails = [emails] if emails else []
+    
+    # Filter out empty emails
+    emails = [e.strip() for e in emails if e and e.strip()]
+    
+    if not emails:
+        print("No valid email addresses provided, skipping email notification", file=sys.stderr)
         return
     
     # Load SMTP configuration from environment
@@ -95,15 +106,7 @@ def send_token_email(team: str, email: str, token: str) -> None:
         print("Email disabled: SMTP_HOST/SMTP_FROM not configured", file=sys.stderr)
         return
     
-    # Build email message
-    msg = EmailMessage()
-    msg["From"] = f"{from_name} <{from_addr}>"
-    msg["To"] = email
-    msg["Subject"] = f"Your Submission Token - {team}"
-    msg["Reply-To"] = reply_to
-    msg["X-Mailer"] = "Argusa Token Generator"
-    
-    # Email body (plain text)
+    # Email body (plain text) - same for all recipients
     plain_body = f"""Hello {team},
 
 Your submission token has been generated for the Argusa Data Challenge.
@@ -235,46 +238,77 @@ Argusa Data Challenge Team
 </html>
 """
     
-    msg.set_content(plain_body)
-    msg.add_alternative(html_body, subtype="html")
-    
-    # Send email
-    try:
-        if use_ssl:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as s:
-                if user and password:
-                    s.login(user, password)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=30) as s:
-                s.ehlo()
-                try:
-                    s.starttls(context=ssl.create_default_context())
+    # Send to each email address
+    for email in emails:
+        if not email:
+            continue
+        
+        try:
+            # Build email message for this recipient
+            msg = EmailMessage()
+            msg["From"] = f"{from_name} <{from_addr}>"
+            msg["To"] = email
+            msg["Subject"] = f"Your Submission Token - {team}"
+            msg["Reply-To"] = reply_to
+            msg["X-Mailer"] = "Argusa Token Generator"
+            
+            msg.set_content(plain_body)
+            msg.add_alternative(html_body, subtype="html")
+            
+            # Send email
+            if use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as s:
+                    if user and password:
+                        s.login(user, password)
+                    s.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=30) as s:
                     s.ehlo()
-                except Exception:
-                    pass
-                if user and password:
-                    s.login(user, password)
-                s.send_message(msg)
-        print(f"✅ Email sent successfully to {email}", file=sys.stderr)
-    except Exception as exc:
-        print(f"❌ Failed to send email to {email}: {exc}", file=sys.stderr)
+                    try:
+                        s.starttls(context=ssl.create_default_context())
+                        s.ehlo()
+                    except Exception:
+                        pass
+                    if user and password:
+                        s.login(user, password)
+                    s.send_message(msg)
+            print(f"✅ Email sent successfully to {email}", file=sys.stderr)
+        except Exception as exc:
+            print(f"❌ Failed to send email to {email}: {exc}", file=sys.stderr)
 
 
 def main() -> None:
     # Load environment variables from config file (if it exists)
     load_env_file("/etc/ecoflex.env")
     
-    parser = argparse.ArgumentParser(description="Generate or rotate a submission token for a team (with optional email)")
+    parser = argparse.ArgumentParser(description="Generate or rotate a submission token for a team (with optional emails)")
     parser.add_argument("--team", required=True, help="Team name (participant_id)")
-    parser.add_argument("--email", default="", help="Email address to attach to the token")
+    parser.add_argument("--email", default="", help="Email address to attach to the token (can be comma-separated for multiple emails)")
+    parser.add_argument("--emails", default="", help="Alternative: comma-separated list of email addresses")
     parser.add_argument("--tokens-path", default=os.getenv("TOKENS_PATH", os.path.join(os.path.dirname(__file__), "tokens.json")), help="Path to tokens JSON mapping")
     parser.add_argument("--length", type=int, default=24, help="Token length parameter for token_urlsafe (default 24)")
     parser.add_argument("--rotate", action="store_true", help="Rotate token even if the team already has one")
     parser.add_argument("--no-email", action="store_true", help="Skip sending email notification")
     parser.add_argument("--env-file", default="/etc/ecoflex.env", help="Path to environment file (default: /etc/ecoflex.env)")
     args = parser.parse_args()
+    
+    # Combine --email and --emails arguments, split by comma
+    email_list = []
+    if args.email:
+        email_list.extend([e.strip() for e in args.email.split(',') if e.strip()])
+    if args.emails:
+        email_list.extend([e.strip() for e in args.emails.split(',') if e.strip()])
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_emails = []
+    for email in email_list:
+        if email and email not in seen:
+            seen.add(email)
+            unique_emails.append(email)
+    
+    email_list = unique_emails
     
     # Allow loading custom env file via argument
     if args.env_file != "/etc/ecoflex.env":
@@ -283,17 +317,31 @@ def main() -> None:
     tokens_path = args.tokens_path
     mapping = load_tokens(tokens_path)
 
-    # Normalize existing mapping to new schema {token: {team,email,used}}
+    # Normalize existing mapping to new schema {token: {team,emails,used}}
+    # emails can be a string (old format) or list (new format)
     normalized: Dict[str, Any] = {}
     if isinstance(mapping, dict):
         for tkn, val in mapping.items():
             if isinstance(val, str):
-                normalized[tkn] = {"team": val, "email": "", "used": False}
+                # Old format: token -> team_name
+                normalized[tkn] = {"team": val, "emails": [], "used": False}
             elif isinstance(val, dict):
+                # New format: token -> {team, email/emails, used}
+                team = str(val.get("team", ""))
+                used = bool(val.get("used", False))
+                
+                # Handle both 'email' (old) and 'emails' (new)
+                emails = val.get("emails", val.get("email", []))
+                if isinstance(emails, str):
+                    # Convert old single email to list
+                    emails = [emails] if emails else []
+                elif not isinstance(emails, list):
+                    emails = []
+                
                 normalized[tkn] = {
-                    "team": str(val.get("team", "")),
-                    "email": str(val.get("email", "")),
-                    "used": bool(val.get("used", False)),
+                    "team": team,
+                    "emails": emails,
+                    "used": used,
                 }
     mapping = normalized
 
@@ -303,21 +351,21 @@ def main() -> None:
         team_to_token.setdefault(info.get("team", ""), tkn)
 
     if args.team in team_to_token and not args.rotate:
-        # Update email if provided
+        # Update emails if provided
         existing_token = team_to_token[args.team]
-        if args.email:
+        if email_list:
             info = mapping.get(existing_token, {})
-            old_email = info.get("email", "")
-            info["email"] = args.email
+            old_emails = info.get("emails", [])
+            info["emails"] = email_list
             mapping[existing_token] = info
             try:
                 write_tokens_atomic(tokens_path, mapping)
             except Exception as exc:
                 print(f"Failed to write tokens file: {exc}", file=sys.stderr)
                 sys.exit(1)
-            # Send email if email was just added or changed
-            if not args.no_email and args.email and args.email != old_email:
-                send_token_email(args.team, args.email, existing_token)
+            # Send email if emails were just added or changed
+            if not args.no_email and email_list and email_list != old_emails:
+                send_token_email(args.team, email_list, existing_token)
         print(existing_token)
         return
 
@@ -331,8 +379,8 @@ def main() -> None:
         old = team_to_token[args.team]
         mapping.pop(old, None)
 
-    # Assign new token with new schema
-    mapping[token] = {"team": args.team, "email": args.email, "used": False}
+    # Assign new token with new schema (emails as list)
+    mapping[token] = {"team": args.team, "emails": email_list, "used": False}
 
     try:
         write_tokens_atomic(tokens_path, mapping)
@@ -340,9 +388,9 @@ def main() -> None:
         print(f"Failed to write tokens file: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    # Send email notification (if email provided and not disabled)
-    if not args.no_email and args.email:
-        send_token_email(args.team, args.email, token)
+    # Send email notification (if emails provided and not disabled)
+    if not args.no_email and email_list:
+        send_token_email(args.team, email_list, token)
 
     print(token)
 

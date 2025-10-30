@@ -99,13 +99,20 @@ def _load_tokens() -> Dict[str, Dict[str, Any]]:
                     if not isinstance(token, str):
                         continue
                     if isinstance(val, str):
-                        result[token] = {"team": val, "email": result.get(token, {}).get("email", ""), "used": False}
+                        result[token] = {"team": val, "emails": result.get(token, {}).get("emails", []), "used": False}
                     elif isinstance(val, dict):
                         team = str(val.get("team", result.get(token, {}).get("team", "")))
-                        email = str(val.get("email", result.get(token, {}).get("email", "")))
+                        
+                        # Handle both old 'email' (string) and new 'emails' (list)
+                        emails = val.get("emails", val.get("email", []))
+                        if isinstance(emails, str):
+                            emails = [emails] if emails else []
+                        elif not isinstance(emails, list):
+                            emails = []
+                        
                         used = bool(val.get("used", False))
                         if team:
-                            result[token] = {"team": team, "email": email, "used": used}
+                            result[token] = {"team": team, "emails": emails, "used": used}
         except Exception:
             pass
     return result
@@ -137,8 +144,16 @@ def _require_token_and_team(x_submission_token: Optional[str]) -> Tuple[str, Dic
     return x_submission_token, info
 
 
-def _send_confirmation_email(to_addr: str, participant_id: str, submission_json: Dict[str, Any]) -> None:
-    if not to_addr:
+def _send_confirmation_email(to_addrs: list, participant_id: str, submission_json: Dict[str, Any]) -> None:
+    """Send confirmation email to multiple recipients."""
+    # Convert single email to list for compatibility
+    if isinstance(to_addrs, str):
+        to_addrs = [to_addrs] if to_addrs else []
+    
+    # Filter out empty emails
+    to_addrs = [addr.strip() for addr in to_addrs if addr and addr.strip()]
+    
+    if not to_addrs:
         return
     if os.getenv("EMAIL_ENABLED", "").lower() not in ("1", "true", "yes", "on"):
         return
@@ -154,19 +169,7 @@ def _send_confirmation_email(to_addr: str, participant_id: str, submission_json:
         logger.warning("Email disabled: SMTP_HOST/SMTP_FROM not configured")
         return
     
-    # Build email with proper headers to avoid spam
-    msg = EmailMessage()
-    msg["From"] = f"{from_name} <{from_addr}>"
-    msg["To"] = to_addr
-    msg["Reply-To"] = reply_to
-    msg["Subject"] = f"✓ Submission Received - {participant_id}"
-    
-    # Add additional headers to improve deliverability
-    msg["X-Mailer"] = "Ecoflex Auto Grader"
-    msg["X-Priority"] = "3"  # Normal priority
-    msg["Importance"] = "Normal"
-    
-    # Create a more professional email body (plain text + HTML)
+    # Create email body (plain text + HTML) - same for all recipients
     text_body = f"""Hello {participant_id},
 
 Your submission has been received successfully!
@@ -291,34 +294,53 @@ This is an automated message. Please do not reply to this email.
 </html>
 """
     
-    # Set both plain text and HTML versions
-    msg.set_content(text_body)
-    msg.add_alternative(html_body, subtype="html")
-    
-    # Attach submission JSON
-    payload = json.dumps(submission_json, indent=2, ensure_ascii=False).encode("utf-8")
-    msg.add_attachment(payload, maintype="application", subtype="json", filename=f"{participant_id}_submission.json")
-    try:
-        if use_ssl:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as s:
-                if user and password:
-                    s.login(user, password)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=30) as s:
-                s.ehlo()
-                try:
-                    s.starttls(context=ssl.create_default_context())
+    # Send to each recipient
+    for to_addr in to_addrs:
+        if not to_addr:
+            continue
+        
+        try:
+            # Build email message for this recipient
+            msg = EmailMessage()
+            msg["From"] = f"{from_name} <{from_addr}>"
+            msg["To"] = to_addr
+            msg["Reply-To"] = reply_to
+            msg["Subject"] = f"✓ Submission Received - {participant_id}"
+            
+            # Add additional headers to improve deliverability
+            msg["X-Mailer"] = "Ecoflex Auto Grader"
+            msg["X-Priority"] = "3"  # Normal priority
+            msg["Importance"] = "Normal"
+            
+            # Set both plain text and HTML versions
+            msg.set_content(text_body)
+            msg.add_alternative(html_body, subtype="html")
+            
+            # Attach submission JSON
+            payload = json.dumps(submission_json, indent=2, ensure_ascii=False).encode("utf-8")
+            msg.add_attachment(payload, maintype="application", subtype="json", filename=f"{participant_id}_submission.json")
+            
+            # Send email
+            if use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as s:
+                    if user and password:
+                        s.login(user, password)
+                    s.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=30) as s:
                     s.ehlo()
-                except Exception:
-                    pass
-                if user and password:
-                    s.login(user, password)
-                s.send_message(msg)
-        logger.info("Sent confirmation email to %s", to_addr)
-    except Exception as exc:
-        logger.exception("Failed to send confirmation email to %s: %s", to_addr, exc)
+                    try:
+                        s.starttls(context=ssl.create_default_context())
+                        s.ehlo()
+                    except Exception:
+                        pass
+                    if user and password:
+                        s.login(user, password)
+                    s.send_message(msg)
+            logger.info("Sent confirmation email to %s", to_addr)
+        except Exception as exc:
+            logger.exception("Failed to send confirmation email to %s: %s", to_addr, exc)
 
 
 @app.on_event("startup")
@@ -593,7 +615,8 @@ async def grade_submission(
             _persist_tokens(_state["token_to_info"])
             # Send confirmation email AFTER all processing is complete (best-effort)
             try:
-                _send_confirmation_email(info.get("email", ""), team, sub)
+                emails = info.get("emails", info.get("email", []))
+                _send_confirmation_email(emails, team, sub)
             except Exception:
                 logger.exception("Email confirmation failed for team %s", team)
         except Exception as exc:
@@ -623,7 +646,10 @@ async def submit_answers(
     # Validate token and get team info
     token, info = _require_token_and_team(x_team_token)
     team = info.get("team", "unknown")
-    email = info.get("email", "")
+    # Get emails as list (handle both old 'email' string and new 'emails' list)
+    emails = info.get("emails", info.get("email", []))
+    if isinstance(emails, str):
+        emails = [emails] if emails else []
 
     # Load questions
     questions = _state.get("questions") or {}
@@ -658,7 +684,7 @@ async def submit_answers(
     logger.info("Submission accepted for team=%s, starting background grading", team)
     
     # Launch background processing
-    asyncio.create_task(_process_submission_background(team, email, sub, questions, body))
+    asyncio.create_task(_process_submission_background(team, emails, sub, questions, body))
     
     # Return 202 Accepted immediately
     return {
@@ -671,7 +697,7 @@ async def submit_answers(
 
 async def _process_submission_background(
     team: str,
-    email: str, 
+    emails: list, 
     submission: Dict[str, Any],
     questions: Dict[str, Any],
     original_body: Dict[str, Any]
@@ -728,9 +754,9 @@ async def _process_submission_background(
         
         # Send confirmation email (best-effort)
         try:
-            if email:
-                _send_confirmation_email(email, team, original_body)
-                logger.info("Confirmation email sent to team=%s (%s)", team, email)
+            if emails:
+                _send_confirmation_email(emails, team, original_body)
+                logger.info("Confirmation email sent to team=%s (to %d recipients)", team, len(emails))
             else:
                 logger.warning("No email address for team=%s, skipping confirmation", team)
         except Exception as exc:
@@ -900,7 +926,8 @@ async def grade_batch(
             _persist_tokens(_state["token_to_info"])
             # Send confirmation email AFTER all processing is complete (best-effort)
             try:
-                _send_confirmation_email(info.get("email", ""), team, {"submissions": items})
+                emails = info.get("emails", info.get("email", []))
+                _send_confirmation_email(emails, team, {"submissions": items})
             except Exception:
                 logger.exception("Email confirmation failed for team %s (batch)", team)
         except Exception as exc:
